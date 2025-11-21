@@ -1,0 +1,9 @@
+# API Contracts
+
+This directory contains API specifications:
+- OpenAPI/Swagger specs for REST APIs
+- GraphQL schemas
+- gRPC proto files
+- Contract tests
+
+Keep API contracts version-controlled and treat them as source of truth.

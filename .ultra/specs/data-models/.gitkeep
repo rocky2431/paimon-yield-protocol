@@ -1,0 +1,9 @@
+# Data Models
+
+This directory contains data model definitions:
+- Database schemas (SQL, Prisma, TypeORM)
+- Entity-Relationship diagrams
+- Data dictionaries
+- Migration scripts references
+
+Keep data models synchronized with architecture.md.

@@ -1,0 +1,43 @@
+# Changes (Feature Proposals)
+
+This directory contains proposed feature changes following OpenSpec pattern.
+
+## Structure
+
+```
+changes/
+├── task-1/                  # Active: Task in progress
+│   ├── proposal.md          # Feature overview and rationale
+│   ├── tasks.md             # Implementation checklist
+│   └── specs/               # Spec deltas (optional, only if specs change)
+│       ├── product.md       # New/modified user stories
+│       └── architecture.md  # Architecture changes
+├── task-2/                  # Active: Another task in progress
+│   └── ...
+└── archive/                 # Completed and merged features
+    ├── task-1-2025-01-15/
+    └── task-3-2025-01-20/
+```
+
+## Workflow (Automated by /ultra-dev)
+
+1. **Start task** (`/ultra-dev {id}`):
+   - Creates `.ultra/changes/task-{id}/` directory
+   - Generates `proposal.md` template
+   - Copies task details to `tasks.md`
+
+2. **During development**:
+   - Optionally create `specs/product.md` if adding/modifying user stories
+   - Optionally create `specs/architecture.md` if changing technology
+   - These are **deltas** (what's new/changed), not full copies
+
+3. **After task completion**:
+   - Spec deltas merged back to main `specs/product.md` and `specs/architecture.md`
+   - Folder moved to `archive/task-{id}-{date}/`
+
+## Benefits
+
+- **Isolation**: Feature proposals don't pollute main specs during development
+- **Reviewability**: Clear diff of what changed (proposal + spec deltas)
+- **Traceability**: Archive preserves decision history
+- **Two-folder pattern**: Active development (changes/) + source of truth (specs/)
