@@ -2,7 +2,13 @@
  * Jest Global Test Setup for Next.js
  */
 
+// TextEncoder/TextDecoder polyfill for viem compatibility
+import { TextEncoder, TextDecoder } from 'util';
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder as typeof global.TextDecoder;
+
 import '@testing-library/jest-dom';
+import { jest } from '@jest/globals';
 
 // =============================================================================
 // Mock Environment Variables
