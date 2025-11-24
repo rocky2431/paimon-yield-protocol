@@ -1,0 +1,16 @@
+{
+  "name": "@paimon/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paimon Yield Protocol Frontend - Next.js 14 App",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
