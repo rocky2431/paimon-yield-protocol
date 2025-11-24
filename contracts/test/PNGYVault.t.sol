@@ -37,6 +37,10 @@ contract PNGYVaultTest is BaseTest {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant REBALANCER_ROLE = keccak256("REBALANCER_ROLE");
 
+    // Events from OpenZeppelin Pausable
+    event Paused(address account);
+    event Unpaused(address account);
+
     // =============================================================================
     // Setup
     // =============================================================================
@@ -321,6 +325,49 @@ contract PNGYVaultTest is BaseTest {
         vm.prank(admin);
         vault.unpause();
         assertFalse(vault.paused());
+    }
+
+    function test_pause_emitsPausedEvent() public {
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, false);
+        emit Paused(admin);
+        vault.pause();
+    }
+
+    function test_unpause_emitsUnpausedEvent() public {
+        vm.prank(admin);
+        vault.pause();
+
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, false);
+        emit Unpaused(admin);
+        vault.unpause();
+    }
+
+    function test_pauseUnpauseCycle_allowsOperations() public {
+        // Deposit first
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        // Pause
+        vm.prank(admin);
+        vault.pause();
+        assertTrue(vault.paused());
+
+        // Verify deposit blocked
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vault.deposit(MIN_DEPOSIT, bob);
+
+        // Unpause
+        vm.prank(admin);
+        vault.unpause();
+        assertFalse(vault.paused());
+
+        // Verify operations work again
+        vm.prank(bob);
+        vault.deposit(MIN_DEPOSIT, bob);
+        assertGt(vault.balanceOf(bob), 0);
     }
 
     function test_updateManagedAssets_success() public {
@@ -820,6 +867,18 @@ contract PNGYVaultTest is BaseTest {
         vm.prank(alice);
         vm.expectRevert(PNGYVault.ZeroAddress.selector);
         vault.requestWithdraw(MIN_DEPOSIT, address(0));
+    }
+
+    function test_requestWithdraw_revertsWhenPaused() public {
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(admin);
+        vault.pause();
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
     }
 
     function test_requestWithdraw_revertsInsufficientShares() public {
