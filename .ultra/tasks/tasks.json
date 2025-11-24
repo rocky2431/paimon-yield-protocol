@@ -396,7 +396,7 @@
       "priority": "P0",
       "dependencies": ["11", "21", "23", "31", "34"],
       "estimated_days": 2,
-      "status": "pending",
+      "status": "completed",
       "type": "architecture",
       "trace_to": "specs/architecture.md#102-deployment-flow"
     },
