@@ -48,7 +48,7 @@
       "priority": "P0",
       "dependencies": ["1"],
       "estimated_days": 1.5,
-      "status": "in_progress",
+      "status": "completed",
       "type": "architecture",
       "trace_to": "specs/architecture.md#33-backend-stack"
     },
