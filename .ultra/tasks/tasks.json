@@ -300,7 +300,7 @@
       "priority": "P1",
       "dependencies": ["22", "24"],
       "estimated_days": 2,
-      "status": "in_progress",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-62-审核和移除-rwa-资产"
     },
