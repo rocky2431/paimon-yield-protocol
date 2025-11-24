@@ -37,6 +37,25 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Precision for share price calculations (1e18)
     uint256 public constant PRECISION = 1e18;
 
+    /// @notice T+1 withdrawal delay (1 day)
+    uint256 public constant WITHDRAWAL_DELAY = 1 days;
+
+    /// @notice Instant withdrawal threshold (10,000 USDT)
+    uint256 public constant INSTANT_WITHDRAWAL_LIMIT = 10_000e18;
+
+    // =============================================================================
+    // Structs
+    // =============================================================================
+
+    /// @notice Withdrawal request for T+1 queue
+    struct WithdrawRequest {
+        uint256 shares;
+        uint256 assets;
+        address receiver;
+        uint256 requestTime;
+        bool claimed;
+    }
+
     // =============================================================================
     // State Variables
     // =============================================================================
@@ -49,6 +68,18 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     /// @notice Emergency withdrawal enabled flag
     bool public emergencyWithdrawEnabled;
+
+    /// @notice Counter for withdrawal request IDs
+    uint256 private _withdrawRequestIdCounter;
+
+    /// @notice Mapping from request ID to withdrawal request
+    mapping(uint256 => WithdrawRequest) public withdrawRequests;
+
+    /// @notice Mapping from user address to their pending request IDs
+    mapping(address => uint256[]) public userWithdrawRequests;
+
+    /// @notice Total shares locked in pending withdrawal requests
+    uint256 public totalLockedShares;
 
     // =============================================================================
     // Events
@@ -77,6 +108,24 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Emitted when emergency mode is toggled
     event EmergencyModeChanged(bool enabled);
 
+    /// @notice Emitted when a withdrawal request is created
+    event WithdrawRequested(
+        uint256 indexed requestId,
+        address indexed owner,
+        address receiver,
+        uint256 shares,
+        uint256 assets,
+        uint256 claimableTime
+    );
+
+    /// @notice Emitted when a withdrawal request is claimed
+    event WithdrawClaimed(
+        uint256 indexed requestId,
+        address indexed owner,
+        address receiver,
+        uint256 assets
+    );
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -98,6 +147,21 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     /// @notice Thrown when amount is zero
     error ZeroAmount();
+
+    /// @notice Thrown when withdrawal request not found
+    error RequestNotFound(uint256 requestId);
+
+    /// @notice Thrown when withdrawal delay not met
+    error WithdrawalDelayNotMet(uint256 requestTime, uint256 currentTime, uint256 requiredDelay);
+
+    /// @notice Thrown when request already claimed
+    error RequestAlreadyClaimed(uint256 requestId);
+
+    /// @notice Thrown when withdrawal exceeds instant limit
+    error ExceedsInstantLimit(uint256 amount, uint256 limit);
+
+    /// @notice Thrown when insufficient shares for withdrawal
+    error InsufficientShares(uint256 available, uint256 required);
 
     // =============================================================================
     // Constructor
@@ -216,11 +280,12 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         emit DepositProcessed(msg.sender, receiver, assets, shares);
     }
 
-    /// @notice Withdraw assets by burning shares
+    /// @notice Withdraw assets by burning shares (instant for small amounts)
     /// @param assets Amount of assets to withdraw
     /// @param receiver Address to receive assets
     /// @param owner Address owning the shares
     /// @return shares Amount of shares burned
+    /// @dev For amounts > INSTANT_WITHDRAWAL_LIMIT, use requestWithdraw instead
     function withdraw(
         uint256 assets,
         address receiver,
@@ -232,17 +297,22 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             revert WithdrawalExceedsMaximum(assets, MAX_WITHDRAWAL);
         }
         if (receiver == address(0)) revert ZeroAddress();
+        // Enforce instant withdrawal limit (bypass in emergency mode)
+        if (assets > INSTANT_WITHDRAWAL_LIMIT && !emergencyWithdrawEnabled) {
+            revert ExceedsInstantLimit(assets, INSTANT_WITHDRAWAL_LIMIT);
+        }
 
         shares = super.withdraw(assets, receiver, owner);
 
         emit WithdrawProcessed(msg.sender, receiver, owner, assets, shares);
     }
 
-    /// @notice Redeem shares for assets
+    /// @notice Redeem shares for assets (instant for small amounts)
     /// @param shares Amount of shares to redeem
     /// @param receiver Address to receive assets
     /// @param owner Address owning the shares
     /// @return assets Amount of assets received
+    /// @dev For amounts > INSTANT_WITHDRAWAL_LIMIT, use requestRedeem instead
     function redeem(
         uint256 shares,
         address receiver,
@@ -256,10 +326,117 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (previewedAssets > MAX_WITHDRAWAL) {
             revert WithdrawalExceedsMaximum(previewedAssets, MAX_WITHDRAWAL);
         }
+        // Enforce instant withdrawal limit (bypass in emergency mode)
+        if (previewedAssets > INSTANT_WITHDRAWAL_LIMIT && !emergencyWithdrawEnabled) {
+            revert ExceedsInstantLimit(previewedAssets, INSTANT_WITHDRAWAL_LIMIT);
+        }
 
         assets = super.redeem(shares, receiver, owner);
 
         emit WithdrawProcessed(msg.sender, receiver, owner, assets, shares);
+    }
+
+    // =============================================================================
+    // T+1 Withdrawal Queue Functions
+    // =============================================================================
+
+    /// @notice Request a withdrawal (T+1 queue for large amounts)
+    /// @param shares Amount of shares to redeem
+    /// @param receiver Address to receive assets after delay
+    /// @return requestId The ID of the withdrawal request
+    function requestWithdraw(
+        uint256 shares,
+        address receiver
+    ) external nonReentrant whenNotPaused returns (uint256 requestId) {
+        if (shares == 0) revert ZeroAmount();
+        if (receiver == address(0)) revert ZeroAddress();
+
+        uint256 assets = previewRedeem(shares);
+        if (assets > MAX_WITHDRAWAL) {
+            revert WithdrawalExceedsMaximum(assets, MAX_WITHDRAWAL);
+        }
+
+        // Check user has enough shares (locked shares are already transferred to vault)
+        uint256 userBalance = balanceOf(msg.sender);
+        if (userBalance < shares) {
+            revert InsufficientShares(userBalance, shares);
+        }
+
+        // Create request
+        requestId = _withdrawRequestIdCounter++;
+        withdrawRequests[requestId] = WithdrawRequest({
+            shares: shares,
+            assets: assets,
+            receiver: receiver,
+            requestTime: block.timestamp,
+            claimed: false
+        });
+
+        userWithdrawRequests[msg.sender].push(requestId);
+        totalLockedShares += shares;
+
+        // Transfer shares to vault (lock them)
+        _transfer(msg.sender, address(this), shares);
+
+        emit WithdrawRequested(
+            requestId,
+            msg.sender,
+            receiver,
+            shares,
+            assets,
+            block.timestamp + WITHDRAWAL_DELAY
+        );
+    }
+
+    /// @notice Claim a withdrawal request after delay
+    /// @param requestId The ID of the withdrawal request
+    function claimWithdraw(uint256 requestId) external nonReentrant {
+        WithdrawRequest storage request = withdrawRequests[requestId];
+
+        if (request.shares == 0) revert RequestNotFound(requestId);
+        if (request.claimed) revert RequestAlreadyClaimed(requestId);
+
+        uint256 claimableTime = request.requestTime + WITHDRAWAL_DELAY;
+        if (block.timestamp < claimableTime) {
+            revert WithdrawalDelayNotMet(request.requestTime, block.timestamp, WITHDRAWAL_DELAY);
+        }
+
+        request.claimed = true;
+        totalLockedShares -= request.shares;
+
+        // Recalculate assets at current share price (may have changed)
+        uint256 currentAssets = previewRedeem(request.shares);
+
+        // Burn the locked shares from vault and transfer assets
+        _burn(address(this), request.shares);
+        IERC20(asset()).safeTransfer(request.receiver, currentAssets);
+
+        emit WithdrawClaimed(requestId, msg.sender, request.receiver, currentAssets);
+    }
+
+    /// @notice Get user's pending withdrawal request IDs
+    /// @param user The user address
+    /// @return requestIds Array of pending request IDs
+    function getUserPendingRequests(address user) external view returns (uint256[] memory) {
+        return userWithdrawRequests[user];
+    }
+
+    /// @notice Get user's total locked shares in pending requests
+    /// @param user The user address
+    /// @return locked Total locked shares
+    function getUserLockedShares(address user) external view returns (uint256 locked) {
+        return _getUserLockedShares(user);
+    }
+
+    /// @notice Internal function to calculate user's locked shares
+    function _getUserLockedShares(address user) internal view returns (uint256 locked) {
+        uint256[] memory requestIds = userWithdrawRequests[user];
+        for (uint256 i = 0; i < requestIds.length; i++) {
+            WithdrawRequest storage req = withdrawRequests[requestIds[i]];
+            if (!req.claimed) {
+                locked += req.shares;
+            }
+        }
     }
 
     // =============================================================================

@@ -674,4 +674,319 @@ contract PNGYVaultTest is BaseTest {
         // Log gas usage for reference
         assertLt(gasUsed, 150_000);
     }
+
+    // =============================================================================
+    // Instant Withdrawal Limit Tests
+    // =============================================================================
+
+    function test_withdraw_instantLimitEnforced() public {
+        // Deposit large amount
+        uint256 largeDeposit = vault.INSTANT_WITHDRAWAL_LIMIT() + MIN_DEPOSIT;
+        usdt.mint(alice, largeDeposit);
+        vm.prank(alice);
+        usdt.approve(address(vault), largeDeposit);
+        vm.prank(alice);
+        vault.deposit(largeDeposit, alice);
+
+        // Try to withdraw more than instant limit
+        uint256 withdrawAmount = vault.INSTANT_WITHDRAWAL_LIMIT() + 1;
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.ExceedsInstantLimit.selector,
+                withdrawAmount,
+                vault.INSTANT_WITHDRAWAL_LIMIT()
+            )
+        );
+        vault.withdraw(withdrawAmount, alice, alice);
+    }
+
+    function test_withdraw_belowInstantLimitSucceeds() public {
+        // Deposit at instant limit
+        uint256 depositAmount = vault.INSTANT_WITHDRAWAL_LIMIT();
+        usdt.mint(alice, depositAmount);
+        vm.prank(alice);
+        usdt.approve(address(vault), depositAmount);
+        vm.prank(alice);
+        vault.deposit(depositAmount, alice);
+
+        // Withdraw exactly at instant limit
+        vm.prank(alice);
+        vault.withdraw(depositAmount, alice, alice);
+
+        assertEq(vault.balanceOf(alice), 0);
+    }
+
+    function test_redeem_instantLimitEnforced() public {
+        // Deposit large amount
+        uint256 largeDeposit = vault.INSTANT_WITHDRAWAL_LIMIT() + MIN_DEPOSIT;
+        usdt.mint(alice, largeDeposit);
+        vm.prank(alice);
+        usdt.approve(address(vault), largeDeposit);
+        vm.prank(alice);
+        uint256 shares = vault.deposit(largeDeposit, alice);
+
+        // Try to redeem more than instant limit worth
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.ExceedsInstantLimit.selector,
+                largeDeposit,
+                vault.INSTANT_WITHDRAWAL_LIMIT()
+            )
+        );
+        vault.redeem(shares, alice, alice);
+    }
+
+    function test_withdraw_bypassInstantLimitInEmergency() public {
+        // Deposit large amount
+        uint256 largeDeposit = vault.INSTANT_WITHDRAWAL_LIMIT() * 2;
+        usdt.mint(alice, largeDeposit);
+        vm.prank(alice);
+        usdt.approve(address(vault), largeDeposit);
+        vm.prank(alice);
+        vault.deposit(largeDeposit, alice);
+
+        // Enable emergency mode
+        vm.prank(admin);
+        vault.setEmergencyWithdraw(true);
+
+        // Withdraw above instant limit should work
+        uint256 withdrawAmount = vault.INSTANT_WITHDRAWAL_LIMIT() * 2;
+        vm.prank(alice);
+        vault.withdraw(withdrawAmount, alice, alice);
+
+        assertEq(vault.balanceOf(alice), 0);
+    }
+
+    // =============================================================================
+    // T+1 Withdrawal Queue Tests
+    // =============================================================================
+
+    function test_requestWithdraw_success() public {
+        // Setup: deposit
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        // Request withdrawal
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        // Verify request created
+        (uint256 reqShares, uint256 reqAssets, address receiver, uint256 requestTime, bool claimed) =
+            vault.withdrawRequests(requestId);
+
+        assertEq(reqShares, shares);
+        assertGt(reqAssets, 0);
+        assertEq(receiver, alice);
+        assertEq(requestTime, block.timestamp);
+        assertFalse(claimed);
+
+        // Verify shares transferred to vault
+        assertEq(vault.balanceOf(alice), 0);
+        assertEq(vault.balanceOf(address(vault)), shares);
+        assertEq(vault.totalLockedShares(), shares);
+    }
+
+    function test_requestWithdraw_createsRequest() public {
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        // Verify request was created with correct ID
+        assertEq(requestId, 0);
+
+        // Verify request data
+        (uint256 reqShares,,,, bool claimed) = vault.withdrawRequests(requestId);
+        assertEq(reqShares, shares);
+        assertFalse(claimed);
+    }
+
+    function test_requestWithdraw_revertsZeroShares() public {
+        vm.prank(alice);
+        vm.expectRevert(PNGYVault.ZeroAmount.selector);
+        vault.requestWithdraw(0, alice);
+    }
+
+    function test_requestWithdraw_revertsZeroReceiver() public {
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(PNGYVault.ZeroAddress.selector);
+        vault.requestWithdraw(MIN_DEPOSIT, address(0));
+    }
+
+    function test_requestWithdraw_revertsInsufficientShares() public {
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.InsufficientShares.selector,
+                MIN_DEPOSIT,
+                MIN_DEPOSIT * 2
+            )
+        );
+        vault.requestWithdraw(MIN_DEPOSIT * 2, alice);
+    }
+
+    function test_claimWithdraw_success() public {
+        // Setup
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        // Wait for delay
+        skip(vault.WITHDRAWAL_DELAY());
+
+        // Claim
+        uint256 balanceBefore = usdt.balanceOf(alice);
+        vm.prank(alice);
+        vault.claimWithdraw(requestId);
+
+        // Verify
+        assertGt(usdt.balanceOf(alice), balanceBefore);
+        assertEq(vault.balanceOf(address(vault)), 0);
+        assertEq(vault.totalLockedShares(), 0);
+
+        // Verify request marked as claimed
+        (,,,, bool claimed) = vault.withdrawRequests(requestId);
+        assertTrue(claimed);
+    }
+
+    function test_claimWithdraw_emitsEvent() public {
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        skip(vault.WITHDRAWAL_DELAY());
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, false, true);
+        emit PNGYVault.WithdrawClaimed(requestId, alice, alice, MIN_DEPOSIT);
+        vault.claimWithdraw(requestId);
+    }
+
+    function test_claimWithdraw_revertsBeforeDelay() public {
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        // Try to claim before delay
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.WithdrawalDelayNotMet.selector,
+                block.timestamp,
+                block.timestamp,
+                vault.WITHDRAWAL_DELAY()
+            )
+        );
+        vault.claimWithdraw(requestId);
+    }
+
+    function test_claimWithdraw_revertsAlreadyClaimed() public {
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        skip(vault.WITHDRAWAL_DELAY());
+
+        vm.prank(alice);
+        vault.claimWithdraw(requestId);
+
+        // Try to claim again
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.RequestAlreadyClaimed.selector, requestId)
+        );
+        vault.claimWithdraw(requestId);
+    }
+
+    function test_claimWithdraw_revertsRequestNotFound() public {
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.RequestNotFound.selector, 999)
+        );
+        vault.claimWithdraw(999);
+    }
+
+    function test_getUserPendingRequests() public {
+        // Use alice's existing balance and approval from setUp
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT * 3, alice);
+
+        // Create 3 requests
+        vm.startPrank(alice);
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
+        vm.stopPrank();
+
+        uint256[] memory requests = vault.getUserPendingRequests(alice);
+        assertEq(requests.length, 3);
+    }
+
+    function test_getUserLockedShares() public {
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT * 2, alice);
+
+        vm.prank(alice);
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
+
+        assertEq(vault.getUserLockedShares(alice), MIN_DEPOSIT);
+
+        // After claiming
+        skip(vault.WITHDRAWAL_DELAY());
+        vm.prank(alice);
+        vault.claimWithdraw(0);
+
+        assertEq(vault.getUserLockedShares(alice), 0);
+    }
+
+    function test_requestWithdraw_multipleUsers() public {
+        // Alice deposits and requests
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+        vm.prank(alice);
+        vault.requestWithdraw(MIN_DEPOSIT, alice);
+
+        // Bob deposits and requests
+        vm.prank(bob);
+        vault.deposit(MIN_DEPOSIT, bob);
+        vm.prank(bob);
+        vault.requestWithdraw(MIN_DEPOSIT, bob);
+
+        assertEq(vault.totalLockedShares(), MIN_DEPOSIT * 2);
+        assertEq(vault.getUserLockedShares(alice), MIN_DEPOSIT);
+        assertEq(vault.getUserLockedShares(bob), MIN_DEPOSIT);
+    }
+
+    function testFuzz_requestWithdraw_validShares(uint256 depositAmount) public {
+        // Bound to avoid exceeding MAX_WITHDRAWAL
+        uint256 maxDeposit = vault.MAX_WITHDRAWAL();
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, maxDeposit);
+
+        vm.prank(alice);
+        uint256 shares = vault.deposit(depositAmount, alice);
+
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        (uint256 reqShares,,,, ) = vault.withdrawRequests(requestId);
+        assertEq(reqShares, shares);
+        assertEq(vault.totalLockedShares(), shares);
+    }
 }
