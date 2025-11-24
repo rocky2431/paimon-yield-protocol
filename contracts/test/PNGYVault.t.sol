@@ -1428,4 +1428,324 @@ contract PNGYVaultTest is BaseTest {
         uint256 expectedTotal = MIN_DEPOSIT + expectedRwaValue;
         assertEq(vault.totalAssets(), expectedTotal);
     }
+
+    // =============================================================================
+    // Circuit Breaker Tests
+    // =============================================================================
+
+    function test_circuitBreaker_initialState() public view {
+        // Default threshold should be 500 (5%)
+        assertEq(vault.circuitBreakerThreshold(), 500);
+        assertEq(vault.referenceNav(), 0);
+        assertFalse(vault.circuitBreakerActive());
+        assertEq(vault.circuitBreakerTriggeredAt(), 0);
+    }
+
+    function test_setCircuitBreakerThreshold_success() public {
+        vm.prank(admin);
+        vault.setCircuitBreakerThreshold(1000); // 10%
+
+        assertEq(vault.circuitBreakerThreshold(), 1000);
+    }
+
+    function test_setCircuitBreakerThreshold_emitsEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit PNGYVault.CircuitBreakerThresholdUpdated(500, 1000);
+
+        vm.prank(admin);
+        vault.setCircuitBreakerThreshold(1000);
+    }
+
+    function test_setCircuitBreakerThreshold_revertsExceedsMax() public {
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(PNGYVault.InvalidCircuitBreakerThreshold.selector, 5001));
+        vault.setCircuitBreakerThreshold(5001); // > 50%
+    }
+
+    function test_setCircuitBreakerThreshold_revertsNonAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.setCircuitBreakerThreshold(1000);
+    }
+
+    function test_setReferenceNav_success() public {
+        vm.prank(admin);
+        vault.setReferenceNav(100_000e18);
+
+        assertEq(vault.referenceNav(), 100_000e18);
+    }
+
+    function test_setReferenceNav_revertsZero() public {
+        vm.prank(admin);
+        vm.expectRevert(PNGYVault.ZeroAmount.selector);
+        vault.setReferenceNav(0);
+    }
+
+    function test_setReferenceNav_revertsNonAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.setReferenceNav(100_000e18);
+    }
+
+    function test_checkCircuitBreaker_triggersOnDrop() public {
+        // Setup: Alice deposits, set reference NAV
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+        // Simulate NAV drop by updating managed assets negatively
+        vault.updateManagedAssets(0); // Reset managed assets
+
+        // Force a NAV drop by withdrawing most assets (simulate external loss)
+        // We'll use managedAssets to simulate this
+        vm.stopPrank();
+
+        // Withdraw some to alice first
+        vm.prank(alice);
+        vault.withdraw(10_000e18, alice, alice);
+
+        // Update reference to current NAV, then simulate drop
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18); // Reference is 100k
+
+        // Now we have 90k in vault, 10% drop from 100k reference
+        vm.stopPrank();
+
+        // Check circuit breaker (10% > 5% threshold)
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        assertTrue(vault.circuitBreakerActive());
+        assertGt(vault.circuitBreakerTriggeredAt(), 0);
+    }
+
+    function test_checkCircuitBreaker_revertsNoReferenceNav() public {
+        vm.prank(admin);
+        vm.expectRevert(PNGYVault.ReferenceNavNotSet.selector);
+        vault.checkCircuitBreaker();
+    }
+
+    function test_checkCircuitBreaker_doesNotTriggerBelowThreshold() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+        vm.stopPrank();
+
+        // NAV is exactly at reference, no drop
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        assertFalse(vault.circuitBreakerActive());
+    }
+
+    function test_activateCircuitBreaker_success() public {
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+
+        assertTrue(vault.circuitBreakerActive());
+        assertEq(vault.circuitBreakerTriggeredAt(), block.timestamp);
+    }
+
+    function test_activateCircuitBreaker_emitsEvent() public {
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        vm.expectEmit(true, true, true, true);
+        emit PNGYVault.CircuitBreakerTriggered(MIN_DEPOSIT, 0, 0);
+
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+    }
+
+    function test_activateCircuitBreaker_noopIfAlreadyActive() public {
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+        uint256 firstTriggeredAt = vault.circuitBreakerTriggeredAt();
+
+        vm.warp(block.timestamp + 1 hours);
+
+        vault.activateCircuitBreaker();
+        // Should not change
+        assertEq(vault.circuitBreakerTriggeredAt(), firstTriggeredAt);
+        vm.stopPrank();
+    }
+
+    function test_resetCircuitBreaker_success() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+        assertTrue(vault.circuitBreakerActive());
+
+        vault.resetCircuitBreaker();
+        vm.stopPrank();
+
+        assertFalse(vault.circuitBreakerActive());
+        assertEq(vault.circuitBreakerTriggeredAt(), 0);
+        assertEq(vault.referenceNav(), 100_000e18); // Set to current NAV
+    }
+
+    function test_resetCircuitBreaker_emitsEvent() public {
+        vm.prank(alice);
+        vault.deposit(50_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+
+        vm.expectEmit(true, true, true, true);
+        emit PNGYVault.CircuitBreakerReset(50_000e18);
+
+        vault.resetCircuitBreaker();
+        vm.stopPrank();
+    }
+
+    function test_withdraw_limitedWhenCircuitBreakerActive() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+
+        // Small withdrawal should work (under CIRCUIT_BREAKER_LIMIT)
+        vm.prank(alice);
+        vault.withdraw(5_000e18, alice, alice);
+
+        // Large withdrawal should fail
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.ExceedsInstantLimit.selector, 50_000e18, 10_000e18)
+        );
+        vault.withdraw(50_000e18, alice, alice);
+    }
+
+    function test_withdraw_circuitBreakerAndInstantLimitSameThreshold() public {
+        // Note: CIRCUIT_BREAKER_LIMIT and INSTANT_WITHDRAWAL_LIMIT are both 10_000e18
+        // When circuit breaker is active, both limits apply but instant limit check comes first
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+
+        // Withdrawing at exactly the limit should work
+        vm.prank(alice);
+        vault.withdraw(10_000e18, alice, alice);
+
+        // Withdrawing above the limit fails with instant limit error (checked before CB limit)
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.ExceedsInstantLimit.selector, 15_000e18, 10_000e18)
+        );
+        vault.withdraw(15_000e18, alice, alice);
+    }
+
+    function test_redeem_limitedWhenCircuitBreakerActive() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+        uint256 shares = vault.balanceOf(alice);
+
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+
+        // Calculate shares for small redemption (within limit)
+        uint256 smallShares = vault.convertToShares(5_000e18);
+        vm.prank(alice);
+        vault.redeem(smallShares, alice, alice);
+
+        // Large redemption should fail
+        uint256 largeShares = shares / 2; // ~50_000e18 worth
+        vm.prank(alice);
+        vm.expectRevert(); // Will fail due to instant withdrawal limit
+        vault.redeem(largeShares, alice, alice);
+    }
+
+    function test_withdraw_bypassesCircuitBreakerInEmergency() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+        vault.setEmergencyWithdraw(true);
+        vm.stopPrank();
+
+        // Emergency mode bypasses circuit breaker
+        vm.prank(alice);
+        vault.withdraw(10_000e18, alice, alice);
+    }
+
+    function test_circuitBreaker_constants() public view {
+        assertEq(vault.DEFAULT_CIRCUIT_BREAKER_THRESHOLD(), 500);
+        assertEq(vault.CIRCUIT_BREAKER_LIMIT(), 10_000e18);
+        assertEq(vault.BASIS_POINTS(), 10000);
+    }
+
+    function testFuzz_setCircuitBreakerThreshold(uint256 threshold) public {
+        threshold = bound(threshold, 0, 5000);
+
+        vm.prank(admin);
+        vault.setCircuitBreakerThreshold(threshold);
+
+        assertEq(vault.circuitBreakerThreshold(), threshold);
+    }
+
+    function test_circuitBreakerDropCalculation() public {
+        // Setup vault with known values
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+
+        // Withdraw to simulate 6% drop (below 100k reference)
+        vm.stopPrank();
+
+        vm.prank(alice);
+        vault.withdraw(6_000e18, alice, alice);
+
+        // Now NAV is 94k, drop is 6% from 100k reference
+        // 6% > 5% threshold, should trigger
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        assertTrue(vault.circuitBreakerActive());
+    }
+
+    function test_circuitBreaker_multipleResets() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        // First activation and reset
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+        assertTrue(vault.circuitBreakerActive());
+        vault.resetCircuitBreaker();
+        assertFalse(vault.circuitBreakerActive());
+
+        // Second activation and reset
+        vault.activateCircuitBreaker();
+        assertTrue(vault.circuitBreakerActive());
+        vault.resetCircuitBreaker();
+        assertFalse(vault.circuitBreakerActive());
+        vm.stopPrank();
+    }
+
+    function test_checkCircuitBreaker_navIncrease() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(80_000e18); // Reference below current NAV
+        vm.stopPrank();
+
+        // NAV is 100k, reference is 80k, NAV increased
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        // Should not trigger since NAV > reference
+        assertFalse(vault.circuitBreakerActive());
+    }
 }

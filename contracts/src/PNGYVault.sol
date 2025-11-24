@@ -52,6 +52,15 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Maximum number of RWA assets in vault
     uint256 public constant MAX_RWA_ASSETS = 20;
 
+    /// @notice Circuit breaker threshold in basis points (500 = 5%)
+    uint256 public constant DEFAULT_CIRCUIT_BREAKER_THRESHOLD = 500;
+
+    /// @notice Circuit breaker withdrawal limit when triggered (10,000 USDT)
+    uint256 public constant CIRCUIT_BREAKER_LIMIT = 10_000e18;
+
+    /// @notice Basis points denominator (10000 = 100%)
+    uint256 public constant BASIS_POINTS = 10000;
+
     // =============================================================================
     // Structs
     // =============================================================================
@@ -118,6 +127,18 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Cached total RWA value for gas optimization
     CachedValue private _cachedRwaValue;
 
+    /// @notice Circuit breaker threshold in basis points (500 = 5%)
+    uint256 public circuitBreakerThreshold;
+
+    /// @notice Reference NAV for circuit breaker calculation
+    uint256 public referenceNav;
+
+    /// @notice Whether circuit breaker is currently active
+    bool public circuitBreakerActive;
+
+    /// @notice Timestamp when circuit breaker was last triggered
+    uint256 public circuitBreakerTriggeredAt;
+
     // =============================================================================
     // Events
     // =============================================================================
@@ -178,6 +199,15 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Emitted when oracle adapter is updated
     event OracleAdapterUpdated(address indexed oldOracle, address indexed newOracle);
 
+    /// @notice Emitted when circuit breaker is triggered
+    event CircuitBreakerTriggered(uint256 currentNav, uint256 referenceNav, uint256 dropBasisPoints);
+
+    /// @notice Emitted when circuit breaker is reset
+    event CircuitBreakerReset(uint256 newReferenceNav);
+
+    /// @notice Emitted when circuit breaker threshold is updated
+    event CircuitBreakerThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -233,6 +263,15 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Thrown when oracle or registry not configured
     error NotConfigured();
 
+    /// @notice Thrown when circuit breaker is active and withdrawal exceeds limit
+    error CircuitBreakerLimitExceeded(uint256 amount, uint256 limit);
+
+    /// @notice Thrown when circuit breaker threshold is invalid
+    error InvalidCircuitBreakerThreshold(uint256 threshold);
+
+    /// @notice Thrown when reference NAV is not set
+    error ReferenceNavNotSet();
+
     // =============================================================================
     // Constructor
     // =============================================================================
@@ -256,6 +295,7 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
         // Initialize state
         lastNavUpdate = block.timestamp;
+        circuitBreakerThreshold = DEFAULT_CIRCUIT_BREAKER_THRESHOLD;
     }
 
     // =============================================================================
@@ -439,6 +479,12 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         if (assets > INSTANT_WITHDRAWAL_LIMIT && !emergencyWithdrawEnabled) {
             revert ExceedsInstantLimit(assets, INSTANT_WITHDRAWAL_LIMIT);
         }
+        // Circuit breaker check (bypass in emergency mode)
+        if (circuitBreakerActive && !emergencyWithdrawEnabled) {
+            if (assets > CIRCUIT_BREAKER_LIMIT) {
+                revert CircuitBreakerLimitExceeded(assets, CIRCUIT_BREAKER_LIMIT);
+            }
+        }
 
         shares = super.withdraw(assets, receiver, owner);
 
@@ -467,6 +513,12 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         // Enforce instant withdrawal limit (bypass in emergency mode)
         if (previewedAssets > INSTANT_WITHDRAWAL_LIMIT && !emergencyWithdrawEnabled) {
             revert ExceedsInstantLimit(previewedAssets, INSTANT_WITHDRAWAL_LIMIT);
+        }
+        // Circuit breaker check (bypass in emergency mode)
+        if (circuitBreakerActive && !emergencyWithdrawEnabled) {
+            if (previewedAssets > CIRCUIT_BREAKER_LIMIT) {
+                revert CircuitBreakerLimitExceeded(previewedAssets, CIRCUIT_BREAKER_LIMIT);
+            }
         }
 
         assets = super.redeem(shares, receiver, owner);
@@ -734,6 +786,80 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     function refreshRWACache() external onlyRole(REBALANCER_ROLE) {
         _cachedRwaValue.value = _calculateRWAValue();
         _cachedRwaValue.timestamp = block.timestamp;
+    }
+
+    // =============================================================================
+    // Circuit Breaker Functions
+    // =============================================================================
+
+    /// @notice Set the circuit breaker threshold
+    /// @dev Only callable by admin role. Max threshold is 5000 (50%)
+    /// @param newThreshold New threshold in basis points (e.g., 500 = 5%)
+    function setCircuitBreakerThreshold(uint256 newThreshold) external onlyRole(ADMIN_ROLE) {
+        if (newThreshold > 5000) revert InvalidCircuitBreakerThreshold(newThreshold);
+
+        uint256 oldThreshold = circuitBreakerThreshold;
+        circuitBreakerThreshold = newThreshold;
+
+        emit CircuitBreakerThresholdUpdated(oldThreshold, newThreshold);
+    }
+
+    /// @notice Set the reference NAV for circuit breaker calculations
+    /// @dev Only callable by admin role. Should be called when NAV is stable.
+    /// @param newReferenceNav The new reference NAV value
+    function setReferenceNav(uint256 newReferenceNav) external onlyRole(ADMIN_ROLE) {
+        if (newReferenceNav == 0) revert ZeroAmount();
+        referenceNav = newReferenceNav;
+    }
+
+    /// @notice Check if circuit breaker should be triggered based on current NAV
+    /// @dev Compares current NAV to reference NAV and triggers if drop exceeds threshold
+    function checkCircuitBreaker() external onlyRole(REBALANCER_ROLE) {
+        if (referenceNav == 0) revert ReferenceNavNotSet();
+
+        uint256 currentNav = totalAssets();
+
+        // If NAV has dropped
+        if (currentNav < referenceNav) {
+            // Calculate drop in basis points: (referenceNav - currentNav) * 10000 / referenceNav
+            uint256 dropBasisPoints = ((referenceNav - currentNav) * BASIS_POINTS) / referenceNav;
+
+            if (dropBasisPoints >= circuitBreakerThreshold) {
+                if (!circuitBreakerActive) {
+                    circuitBreakerActive = true;
+                    circuitBreakerTriggeredAt = block.timestamp;
+                    emit CircuitBreakerTriggered(currentNav, referenceNav, dropBasisPoints);
+                }
+            }
+        }
+    }
+
+    /// @notice Reset the circuit breaker and set new reference NAV
+    /// @dev Only callable by admin role. Use after investigating and resolving the issue.
+    function resetCircuitBreaker() external onlyRole(ADMIN_ROLE) {
+        uint256 newReferenceNav = totalAssets();
+        circuitBreakerActive = false;
+        circuitBreakerTriggeredAt = 0;
+        referenceNav = newReferenceNav;
+
+        emit CircuitBreakerReset(newReferenceNav);
+    }
+
+    /// @notice Force activate circuit breaker manually
+    /// @dev Only callable by admin role. Use in emergency situations.
+    function activateCircuitBreaker() external onlyRole(ADMIN_ROLE) {
+        if (!circuitBreakerActive) {
+            circuitBreakerActive = true;
+            circuitBreakerTriggeredAt = block.timestamp;
+
+            uint256 currentNav = totalAssets();
+            uint256 dropBasisPoints = 0;
+            if (referenceNav > 0 && currentNav < referenceNav) {
+                dropBasisPoints = ((referenceNav - currentNav) * BASIS_POINTS) / referenceNav;
+            }
+
+            emit CircuitBreakerTriggered(currentNav, referenceNav, dropBasisPoints);
+        }
     }
 
     // =============================================================================
