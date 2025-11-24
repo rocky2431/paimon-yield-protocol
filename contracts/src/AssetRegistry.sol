@@ -61,6 +61,9 @@ contract AssetRegistry is AccessControl {
     /// @notice Mapping to track if an address is registered
     mapping(address => bool) private _isRegistered;
 
+    /// @notice Mapping to track assets marked for removal
+    mapping(address => bool) private _markedForRemoval;
+
     // =============================================================================
     // Events
     // =============================================================================
@@ -82,6 +85,12 @@ contract AssetRegistry is AccessControl {
 
     /// @notice Emitted when an asset's oracle source is updated
     event OracleSourceUpdated(address indexed tokenAddress, address newOracleSource);
+
+    /// @notice Emitted when an asset is marked for removal
+    event AssetMarkedForRemoval(address indexed tokenAddress);
+
+    /// @notice Emitted when an asset is unmarked for removal
+    event AssetUnmarkedForRemoval(address indexed tokenAddress);
 
     // =============================================================================
     // Errors
@@ -241,6 +250,30 @@ contract AssetRegistry is AccessControl {
         emit OracleSourceUpdated(tokenAddress, newOracleSource);
     }
 
+    /// @notice Mark an asset for removal (pending state before actual removal)
+    /// @dev Used to signal that asset should be liquidated and removed from vaults
+    /// @param tokenAddress The token address to mark
+    function markAssetForRemoval(address tokenAddress) external onlyRole(ADMIN_ROLE) {
+        if (!_isRegistered[tokenAddress]) revert AssetNotFound(tokenAddress);
+
+        _markedForRemoval[tokenAddress] = true;
+        // Also deactivate the asset to prevent new purchases
+        _assets[tokenAddress].isActive = false;
+
+        emit AssetMarkedForRemoval(tokenAddress);
+        emit AssetStatusUpdated(tokenAddress, false);
+    }
+
+    /// @notice Unmark an asset for removal
+    /// @param tokenAddress The token address to unmark
+    function unmarkAssetForRemoval(address tokenAddress) external onlyRole(ADMIN_ROLE) {
+        if (!_isRegistered[tokenAddress]) revert AssetNotFound(tokenAddress);
+
+        _markedForRemoval[tokenAddress] = false;
+
+        emit AssetUnmarkedForRemoval(tokenAddress);
+    }
+
     // =============================================================================
     // View Functions
     // =============================================================================
@@ -326,5 +359,12 @@ contract AssetRegistry is AccessControl {
     function getAssetByIndex(uint256 index) external view returns (RWAAsset memory) {
         require(index < _assetList.length, "Index out of bounds");
         return _assets[_assetList[index]];
+    }
+
+    /// @notice Check if an asset is marked for removal
+    /// @param tokenAddress The token address to check
+    /// @return True if marked for removal
+    function isMarkedForRemoval(address tokenAddress) external view returns (bool) {
+        return _markedForRemoval[tokenAddress];
     }
 }

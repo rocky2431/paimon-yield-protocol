@@ -230,6 +230,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Emitted when RWA tokens are sold during withdrawal
     event RWATokensSold(address indexed token, uint256 tokensSold, uint256 usdtReceived);
 
+    /// @notice Emitted when an RWA asset is liquidated and removed
+    event RWAAssetLiquidated(address indexed token, uint256 tokensSold, uint256 usdtReceived);
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -806,6 +809,59 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         // Invalidate cache
         _cachedRwaValue.timestamp = 0;
 
+        emit RWAAssetRemoved(tokenAddress);
+    }
+
+    /// @notice Remove an RWA asset with liquidation (sell all holdings first)
+    /// @dev Only callable by admin role. Sells all tokens of the asset before removing.
+    /// @param tokenAddress The RWA token address to liquidate and remove
+    /// @return usdtReceived Amount of USDT received from liquidation
+    function removeRWAAssetWithLiquidation(
+        address tokenAddress
+    ) external onlyRole(ADMIN_ROLE) nonReentrant returns (uint256 usdtReceived) {
+        uint256 index = _holdingIndex[tokenAddress];
+        if (index == 0) revert RWAAssetNotFound(tokenAddress);
+
+        // Get token balance to sell
+        uint256 tokenBalance = IERC20(tokenAddress).balanceOf(address(this));
+
+        // If we have tokens and swap helper is configured, sell them
+        if (tokenBalance > 0 && address(swapHelper) != address(0)) {
+            address underlyingAsset = asset();
+
+            // Approve SwapHelper
+            IERC20(tokenAddress).safeIncreaseAllowance(address(swapHelper), tokenBalance);
+
+            // Execute swap to convert all tokens to USDT
+            try swapHelper.sellRWAAsset(
+                tokenAddress,
+                underlyingAsset,
+                tokenBalance,
+                defaultSwapSlippage
+            ) returns (uint256 received) {
+                usdtReceived = received;
+            } catch {
+                revert RWASwapFailed(tokenAddress, tokenBalance);
+            }
+        }
+
+        // Remove from holdings array
+        uint256 actualIndex = index - 1;
+        uint256 lastIndex = _rwaHoldings.length - 1;
+
+        if (actualIndex != lastIndex) {
+            RWAHolding memory lastHolding = _rwaHoldings[lastIndex];
+            _rwaHoldings[actualIndex] = lastHolding;
+            _holdingIndex[lastHolding.tokenAddress] = index;
+        }
+
+        _rwaHoldings.pop();
+        delete _holdingIndex[tokenAddress];
+
+        // Invalidate cache
+        _cachedRwaValue.timestamp = 0;
+
+        emit RWAAssetLiquidated(tokenAddress, tokenBalance, usdtReceived);
         emit RWAAssetRemoved(tokenAddress);
     }
 
