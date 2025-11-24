@@ -32,6 +32,11 @@ contract MockOracleAdapter is IOracleAdapter {
     }
 
     /// @inheritdoc IOracleAdapter
+    function getPriceWithSource(address asset) external view override returns (uint256 price, uint256 updatedAt, OracleSource source) {
+        return (_prices[asset], _timestamps[asset], OracleSource.PRIMARY);
+    }
+
+    /// @inheritdoc IOracleAdapter
     function isPriceStale(address asset) external view override returns (bool isStale) {
         // Consider stale if older than 2 hours
         return _timestamps[asset] + 2 hours < block.timestamp;
