@@ -402,7 +402,8 @@ contract ChainlinkOracleTest is Test {
     // =============================================================================
 
     function testFuzz_ConfigureAsset_AnyValidPrice(int256 price) public {
-        vm.assume(price > 0 && price < type(int224).max);
+        // Constrain to prevent overflow when converting 8 → 18 decimals
+        vm.assume(price > 0 && price < 1e28);
 
         aggregator1.setAnswer(price);
 
