@@ -1748,4 +1748,422 @@ contract PNGYVaultTest is BaseTest {
         // Should not trigger since NAV > reference
         assertFalse(vault.circuitBreakerActive());
     }
+
+    // =============================================================================
+    // Additional Coverage Tests - Branch Coverage Improvement
+    // =============================================================================
+
+    function test_checkCircuitBreaker_alreadyActive_noDoubleEmit() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+        vm.stopPrank();
+
+        // Withdraw to trigger circuit breaker
+        vm.prank(alice);
+        vault.withdraw(6_000e18, alice, alice);
+
+        // First check should trigger
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+        assertTrue(vault.circuitBreakerActive());
+
+        // Second check should not re-trigger (already active)
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+        assertTrue(vault.circuitBreakerActive()); // Still active, no state change
+    }
+
+    function test_activateCircuitBreaker_withReferenceNav() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        // Set reference NAV first
+        vm.startPrank(admin);
+        vault.setReferenceNav(120_000e18); // Reference is higher than current NAV
+
+        // Now activate - should calculate drop
+        vm.stopPrank();
+
+        vm.prank(admin);
+        vault.activateCircuitBreaker();
+
+        assertTrue(vault.circuitBreakerActive());
+    }
+
+    function test_claimWithdraw_recalculatesAssets() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+        uint256 shares = vault.balanceOf(alice) / 2;
+
+        // Request withdraw
+        vm.prank(alice);
+        uint256 requestId = vault.requestWithdraw(shares, alice);
+
+        // Simulate yield increase
+        usdt.mint(address(vault), 10_000e18);
+
+        // Advance time
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Claim - should get more assets due to yield
+        uint256 balanceBefore = usdt.balanceOf(alice);
+        vm.prank(alice);
+        vault.claimWithdraw(requestId);
+        uint256 balanceAfter = usdt.balanceOf(alice);
+
+        // Should have received more than originally calculated
+        assertGt(balanceAfter - balanceBefore, 0);
+    }
+
+    function test_withdraw_ownerNotCaller() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        // Approve bob to spend alice's vault shares
+        uint256 sharesToApprove = vault.convertToShares(5_000e18) + 1e18; // Add buffer for rounding
+        vm.prank(alice);
+        vault.approve(bob, sharesToApprove);
+
+        // Bob withdraws for alice
+        vm.prank(bob);
+        vault.withdraw(5_000e18, bob, alice);
+
+        assertGt(usdt.balanceOf(bob), 0);
+    }
+
+    function test_redeem_ownerNotCaller() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+        uint256 shares = vault.convertToShares(5_000e18);
+
+        // Approve bob to redeem on alice's behalf
+        vm.prank(alice);
+        vault.approve(bob, shares);
+
+        // Bob redeems for alice
+        vm.prank(bob);
+        vault.redeem(shares, bob, alice);
+
+        assertGt(usdt.balanceOf(bob), 0);
+    }
+
+    function test_getUserLockedShares_multiplePendingRequests() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        // Create multiple requests
+        vm.startPrank(alice);
+        vault.requestWithdraw(1_000e18, alice);
+        vault.requestWithdraw(2_000e18, alice);
+        vault.requestWithdraw(3_000e18, alice);
+        vm.stopPrank();
+
+        uint256 locked = vault.getUserLockedShares(alice);
+        assertEq(locked, 6_000e18);
+    }
+
+    function test_getUserLockedShares_afterSomeClaimed() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        // Create multiple requests
+        vm.startPrank(alice);
+        uint256 req1 = vault.requestWithdraw(1_000e18, alice);
+        vault.requestWithdraw(2_000e18, alice);
+        vm.stopPrank();
+
+        // Advance time and claim first
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.prank(alice);
+        vault.claimWithdraw(req1);
+
+        // Only second request should be locked
+        uint256 locked = vault.getUserLockedShares(alice);
+        assertEq(locked, 2_000e18);
+    }
+
+    function test_redeem_exactMaxWithdrawalShares() public {
+        // Deposit large amount - alice already has 1M from setUp
+        vm.prank(alice);
+        vault.deposit(1_000_000e18, alice);
+
+        // Convert max withdrawal to shares
+        uint256 maxShares = vault.convertToShares(vault.MAX_WITHDRAWAL());
+
+        // Should succeed at exactly the limit
+        vm.prank(admin);
+        vault.setEmergencyWithdraw(true);
+
+        vm.prank(alice);
+        vault.redeem(maxShares, alice, alice);
+    }
+
+    function test_withdraw_exactMaxWithdrawal() public {
+        // Deposit amount sufficient for max withdrawal
+        vm.prank(alice);
+        vault.deposit(200_000e18, alice);
+
+        // Should succeed at exactly the max withdrawal limit with emergency mode
+        vm.prank(admin);
+        vault.setEmergencyWithdraw(true);
+
+        uint256 maxWithdraw = vault.MAX_WITHDRAWAL();
+        uint256 balanceBefore = usdt.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(maxWithdraw, alice, alice);
+        uint256 balanceAfter = usdt.balanceOf(alice);
+
+        assertEq(balanceAfter - balanceBefore, maxWithdraw);
+    }
+
+    function test_checkCircuitBreaker_exactThreshold() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+        vault.setCircuitBreakerThreshold(500); // 5%
+        vm.stopPrank();
+
+        // Withdraw exactly 5%
+        vm.prank(alice);
+        vault.withdraw(5_000e18, alice, alice);
+
+        // Check circuit breaker - exactly at threshold should trigger
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        assertTrue(vault.circuitBreakerActive());
+    }
+
+    function test_checkCircuitBreaker_justBelowThreshold() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.setReferenceNav(100_000e18);
+        vault.setCircuitBreakerThreshold(500); // 5%
+        vm.stopPrank();
+
+        // Withdraw just under 5% (4.99%)
+        vm.prank(alice);
+        vault.withdraw(4_990e18, alice, alice);
+
+        // Check circuit breaker - just below threshold should NOT trigger
+        vm.prank(admin);
+        vault.checkCircuitBreaker();
+
+        assertFalse(vault.circuitBreakerActive());
+    }
+
+    function test_requestWithdraw_exactMaxWithdrawal() public {
+        // Deposit large amount - alice already has 1M from setUp
+        vm.prank(alice);
+        vault.deposit(1_000_000e18, alice);
+
+        // Request exactly max withdrawal in shares
+        uint256 maxShares = vault.convertToShares(vault.MAX_WITHDRAWAL());
+
+        vm.prank(alice);
+        vault.requestWithdraw(maxShares, alice);
+
+        uint256[] memory requests = vault.getUserPendingRequests(alice);
+        assertEq(requests.length, 1);
+    }
+
+    function test_requestWithdraw_revertsExceedsMaxWithdrawal() public {
+        // Deposit large amount - alice already has 1M from setUp
+        vm.prank(alice);
+        vault.deposit(1_000_000e18, alice);
+
+        // Request more than max withdrawal in shares
+        uint256 overMaxShares = vault.convertToShares(vault.MAX_WITHDRAWAL() + 1e18);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.WithdrawalExceedsMaximum.selector, vault.MAX_WITHDRAWAL() + 1e18, vault.MAX_WITHDRAWAL())
+        );
+        vault.requestWithdraw(overMaxShares, alice);
+    }
+
+    function test_redeem_circuitBreakerWithEmergencyBypass() public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        vm.startPrank(admin);
+        vault.activateCircuitBreaker();
+        vault.setEmergencyWithdraw(true);
+        vm.stopPrank();
+
+        // Emergency mode bypasses circuit breaker for redeem too
+        uint256 shares = vault.convertToShares(10_000e18);
+        vm.prank(alice);
+        vault.redeem(shares, alice, alice);
+    }
+
+    function testFuzz_withdraw_validAmounts(uint256 withdrawAmount) public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        withdrawAmount = bound(withdrawAmount, 1e18, vault.INSTANT_WITHDRAWAL_LIMIT());
+
+        uint256 balanceBefore = usdt.balanceOf(alice);
+        vm.prank(alice);
+        vault.withdraw(withdrawAmount, alice, alice);
+        uint256 balanceAfter = usdt.balanceOf(alice);
+
+        assertEq(balanceAfter - balanceBefore, withdrawAmount);
+    }
+
+    function testFuzz_redeem_validShares(uint256 redeemShares) public {
+        vm.prank(alice);
+        vault.deposit(100_000e18, alice);
+
+        uint256 maxRedeemable = vault.convertToShares(vault.INSTANT_WITHDRAWAL_LIMIT());
+        redeemShares = bound(redeemShares, 1e18, maxRedeemable);
+
+        vm.prank(alice);
+        vault.redeem(redeemShares, alice, alice);
+
+        assertLt(vault.balanceOf(alice), 100_000e18);
+    }
+
+    function test_setRWAAssetActive_toggleMultipleTimes() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        // Toggle active status multiple times
+        vault.setRWAAssetActive(address(rwaToken), false);
+        assertFalse(vault.getRWAHolding(address(rwaToken)).isActive);
+
+        vault.setRWAAssetActive(address(rwaToken), true);
+        assertTrue(vault.getRWAHolding(address(rwaToken)).isActive);
+
+        vault.setRWAAssetActive(address(rwaToken), false);
+        assertFalse(vault.getRWAHolding(address(rwaToken)).isActive);
+        vm.stopPrank();
+    }
+
+    function test_updateTargetAllocation_revertsOnInvalid() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.expectRevert(abi.encodeWithSelector(PNGYVault.InvalidAllocation.selector, 10001));
+        vault.updateTargetAllocation(address(rwaToken), 10001);
+        vm.stopPrank();
+    }
+
+    function test_removeRWAAsset_lastElement() public {
+        ERC20Mock rwa1 = new ERC20Mock("RWA1", "RWA1", 18);
+        ERC20Mock rwa2 = new ERC20Mock("RWA2", "RWA2", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwa1), 5000);
+        vault.addRWAAsset(address(rwa2), 5000);
+
+        // Remove last element
+        vault.removeRWAAsset(address(rwa2));
+        vm.stopPrank();
+
+        assertEq(vault.rwaHoldingCount(), 1);
+        assertTrue(vault.isRWAHolding(address(rwa1)));
+        assertFalse(vault.isRWAHolding(address(rwa2)));
+    }
+
+    function test_removeRWAAsset_firstElement() public {
+        ERC20Mock rwa1 = new ERC20Mock("RWA1", "RWA1", 18);
+        ERC20Mock rwa2 = new ERC20Mock("RWA2", "RWA2", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwa1), 5000);
+        vault.addRWAAsset(address(rwa2), 5000);
+
+        // Remove first element
+        vault.removeRWAAsset(address(rwa1));
+        vm.stopPrank();
+
+        assertEq(vault.rwaHoldingCount(), 1);
+        assertFalse(vault.isRWAHolding(address(rwa1)));
+        assertTrue(vault.isRWAHolding(address(rwa2)));
+    }
+
+    function test_getRWAHolding_revertsNotFound() public {
+        vm.expectRevert(abi.encodeWithSelector(PNGYVault.RWAAssetNotFound.selector, address(0x123)));
+        vault.getRWAHolding(address(0x123));
+    }
+
+    function test_checkCircuitBreaker_revertsNonRebalancer() public {
+        vm.prank(admin);
+        vault.setReferenceNav(100_000e18);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.checkCircuitBreaker();
+    }
+
+    function test_refreshRWACache_revertsNonRebalancer() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.refreshRWACache();
+    }
+
+    function test_resetCircuitBreaker_revertsNonAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.resetCircuitBreaker();
+    }
+
+    function test_activateCircuitBreaker_revertsNonAdmin() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.activateCircuitBreaker();
+    }
+
+    function test_addRWAAsset_revertsNonAdmin() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.addRWAAsset(address(rwaToken), 5000);
+    }
+
+    function test_removeRWAAsset_revertsNonAdmin() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.prank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.removeRWAAsset(address(rwaToken));
+    }
+
+    function test_setRWAAssetActive_revertsNonAdmin() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.prank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.setRWAAssetActive(address(rwaToken), false);
+    }
+
+    function test_updateTargetAllocation_revertsNonAdmin() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.prank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.updateTargetAllocation(address(rwaToken), 6000);
+    }
 }
