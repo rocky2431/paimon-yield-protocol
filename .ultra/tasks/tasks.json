@@ -504,7 +504,7 @@
       "priority": "P1",
       "dependencies": ["3", "41"],
       "estimated_days": 2,
-      "status": "in_progress",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-63-查看-rwa-资产详情"
     },
