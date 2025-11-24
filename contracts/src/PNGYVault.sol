@@ -233,6 +233,17 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Emitted when an RWA asset is liquidated and removed
     event RWAAssetLiquidated(address indexed token, uint256 tokensSold, uint256 usdtReceived);
 
+    /// @notice Emitted when rebalance is executed
+    event RebalanceExecuted(
+        address[] sellAssets,
+        uint256[] sellAmounts,
+        uint256[] sellReceived,
+        address[] buyAssets,
+        uint256[] buyAmounts,
+        uint256[] buyReceived,
+        uint256 timestamp
+    );
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -302,6 +313,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     /// @notice Thrown when RWA token swap fails
     error RWASwapFailed(address token, uint256 amount);
+
+    /// @notice Thrown when array lengths don't match
+    error ArrayLengthMismatch();
 
     // =============================================================================
     // Constructor
@@ -978,6 +992,243 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
             }
 
             emit CircuitBreakerTriggered(currentNav, referenceNav, dropBasisPoints);
+        }
+    }
+
+    // =============================================================================
+    // Rebalance Functions
+    // =============================================================================
+
+    /// @notice Execute rebalance by selling and buying RWA assets
+    /// @dev Only callable by REBALANCER_ROLE. Uses SwapHelper for DEX swaps.
+    /// @param sellAssets Array of RWA token addresses to sell
+    /// @param sellAmounts Array of amounts to sell (in token decimals)
+    /// @param buyAssets Array of RWA token addresses to buy
+    /// @param buyAmounts Array of USDT amounts to spend on each buy
+    /// @return sellReceived Array of USDT received from each sell
+    /// @return buyReceived Array of tokens received from each buy
+    function rebalance(
+        address[] calldata sellAssets,
+        uint256[] calldata sellAmounts,
+        address[] calldata buyAssets,
+        uint256[] calldata buyAmounts
+    ) external onlyRole(REBALANCER_ROLE) nonReentrant whenNotPaused returns (
+        uint256[] memory sellReceived,
+        uint256[] memory buyReceived
+    ) {
+        // Validate swap helper is configured
+        if (address(swapHelper) == address(0)) revert NotConfigured();
+
+        // Validate array lengths
+        if (sellAssets.length != sellAmounts.length) revert ArrayLengthMismatch();
+        if (buyAssets.length != buyAmounts.length) revert ArrayLengthMismatch();
+
+        address underlyingAsset = asset();
+        sellReceived = new uint256[](sellAssets.length);
+        buyReceived = new uint256[](buyAssets.length);
+
+        // Execute sells first to generate USDT
+        for (uint256 i = 0; i < sellAssets.length;) {
+            if (sellAmounts[i] == 0) revert ZeroAmount();
+
+            // Verify asset is in holdings
+            if (_holdingIndex[sellAssets[i]] == 0) {
+                revert RWAAssetNotFound(sellAssets[i]);
+            }
+
+            // Use forceApprove to avoid overflow with existing allowances
+            IERC20(sellAssets[i]).forceApprove(address(swapHelper), sellAmounts[i]);
+
+            // Execute sell
+            try swapHelper.sellRWAAsset(
+                sellAssets[i],
+                underlyingAsset,
+                sellAmounts[i],
+                defaultSwapSlippage
+            ) returns (uint256 received) {
+                sellReceived[i] = received;
+                emit RWATokensSold(sellAssets[i], sellAmounts[i], received);
+            } catch {
+                revert RWASwapFailed(sellAssets[i], sellAmounts[i]);
+            }
+
+            unchecked { ++i; }
+        }
+
+        // Execute buys
+        for (uint256 i = 0; i < buyAssets.length;) {
+            if (buyAmounts[i] == 0) revert ZeroAmount();
+
+            // Verify asset is in holdings
+            if (_holdingIndex[buyAssets[i]] == 0) {
+                revert RWAAssetNotFound(buyAssets[i]);
+            }
+
+            // Use forceApprove to avoid overflow with existing allowances
+            IERC20(underlyingAsset).forceApprove(address(swapHelper), buyAmounts[i]);
+
+            // Execute buy
+            try swapHelper.buyRWAAsset(
+                underlyingAsset,
+                buyAssets[i],
+                buyAmounts[i],
+                defaultSwapSlippage
+            ) returns (uint256 received) {
+                buyReceived[i] = received;
+                emit RWATokensPurchased(buyAssets[i], buyAmounts[i], received);
+            } catch {
+                revert RWASwapFailed(buyAssets[i], buyAmounts[i]);
+            }
+
+            unchecked { ++i; }
+        }
+
+        // Invalidate RWA cache
+        _cachedRwaValue.timestamp = 0;
+
+        emit RebalanceExecuted(
+            sellAssets,
+            sellAmounts,
+            sellReceived,
+            buyAssets,
+            buyAmounts,
+            buyReceived,
+            block.timestamp
+        );
+
+        return (sellReceived, buyReceived);
+    }
+
+    /// @notice Execute rebalance and update target allocations
+    /// @dev Only callable by REBALANCER_ROLE. Combines rebalance with allocation update.
+    /// @param sellAssets Array of RWA token addresses to sell
+    /// @param sellAmounts Array of amounts to sell
+    /// @param buyAssets Array of RWA token addresses to buy
+    /// @param buyAmounts Array of USDT amounts to spend on each buy
+    /// @param newAllocations New target allocations for all holdings (in basis points)
+    /// @return sellReceived Array of USDT received from each sell
+    /// @return buyReceived Array of tokens received from each buy
+    function rebalanceWithNewAllocations(
+        address[] calldata sellAssets,
+        uint256[] calldata sellAmounts,
+        address[] calldata buyAssets,
+        uint256[] calldata buyAmounts,
+        uint256[] calldata newAllocations
+    ) external onlyRole(REBALANCER_ROLE) nonReentrant whenNotPaused returns (
+        uint256[] memory sellReceived,
+        uint256[] memory buyReceived
+    ) {
+        // Update allocations first
+        _updateAllocations(newAllocations);
+
+        // Skip swaps if no trades to execute
+        if (sellAssets.length == 0 && buyAssets.length == 0) {
+            return (new uint256[](0), new uint256[](0));
+        }
+
+        // Execute rebalance swaps via internal function
+        return _executeRebalanceSwaps(sellAssets, sellAmounts, buyAssets, buyAmounts);
+    }
+
+    /// @dev Internal function to update target allocations
+    function _updateAllocations(uint256[] calldata newAllocations) internal {
+        if (newAllocations.length != _rwaHoldings.length) revert ArrayLengthMismatch();
+
+        uint256 totalAllocation;
+        for (uint256 i = 0; i < newAllocations.length;) {
+            if (newAllocations[i] > BASIS_POINTS) revert InvalidAllocation(newAllocations[i]);
+            totalAllocation += newAllocations[i];
+            unchecked { ++i; }
+        }
+        if (totalAllocation > BASIS_POINTS) revert InvalidAllocation(totalAllocation);
+
+        for (uint256 i = 0; i < _rwaHoldings.length;) {
+            uint256 oldAllocation = _rwaHoldings[i].targetAllocation;
+            _rwaHoldings[i].targetAllocation = newAllocations[i];
+            emit TargetAllocationUpdated(_rwaHoldings[i].tokenAddress, oldAllocation, newAllocations[i]);
+            unchecked { ++i; }
+        }
+    }
+
+    /// @dev Internal function to execute rebalance swaps
+    function _executeRebalanceSwaps(
+        address[] calldata sellAssets,
+        uint256[] calldata sellAmounts,
+        address[] calldata buyAssets,
+        uint256[] calldata buyAmounts
+    ) internal returns (uint256[] memory sellReceived, uint256[] memory buyReceived) {
+        if (address(swapHelper) == address(0)) revert NotConfigured();
+        if (sellAssets.length != sellAmounts.length) revert ArrayLengthMismatch();
+        if (buyAssets.length != buyAmounts.length) revert ArrayLengthMismatch();
+
+        sellReceived = new uint256[](sellAssets.length);
+        buyReceived = new uint256[](buyAssets.length);
+
+        // Execute sells
+        _executeSells(sellAssets, sellAmounts, sellReceived);
+
+        // Execute buys
+        _executeBuys(buyAssets, buyAmounts, buyReceived);
+
+        // Invalidate cache
+        _cachedRwaValue.timestamp = 0;
+
+        emit RebalanceExecuted(
+            sellAssets, sellAmounts, sellReceived,
+            buyAssets, buyAmounts, buyReceived,
+            block.timestamp
+        );
+    }
+
+    /// @dev Internal function to execute sell operations
+    function _executeSells(
+        address[] calldata sellAssets,
+        uint256[] calldata sellAmounts,
+        uint256[] memory sellReceived
+    ) internal {
+        address underlyingAsset = asset();
+        for (uint256 i = 0; i < sellAssets.length;) {
+            if (sellAmounts[i] == 0) revert ZeroAmount();
+            if (_holdingIndex[sellAssets[i]] == 0) revert RWAAssetNotFound(sellAssets[i]);
+
+            // Use forceApprove to avoid overflow with existing allowances
+            IERC20(sellAssets[i]).forceApprove(address(swapHelper), sellAmounts[i]);
+
+            try swapHelper.sellRWAAsset(
+                sellAssets[i], underlyingAsset, sellAmounts[i], defaultSwapSlippage
+            ) returns (uint256 received) {
+                sellReceived[i] = received;
+                emit RWATokensSold(sellAssets[i], sellAmounts[i], received);
+            } catch {
+                revert RWASwapFailed(sellAssets[i], sellAmounts[i]);
+            }
+            unchecked { ++i; }
+        }
+    }
+
+    /// @dev Internal function to execute buy operations
+    function _executeBuys(
+        address[] calldata buyAssets,
+        uint256[] calldata buyAmounts,
+        uint256[] memory buyReceived
+    ) internal {
+        address underlyingAsset = asset();
+        for (uint256 i = 0; i < buyAssets.length;) {
+            if (buyAmounts[i] == 0) revert ZeroAmount();
+            if (_holdingIndex[buyAssets[i]] == 0) revert RWAAssetNotFound(buyAssets[i]);
+
+            // Use forceApprove to avoid overflow with existing allowances
+            IERC20(underlyingAsset).forceApprove(address(swapHelper), buyAmounts[i]);
+
+            try swapHelper.buyRWAAsset(
+                underlyingAsset, buyAssets[i], buyAmounts[i], defaultSwapSlippage
+            ) returns (uint256 received) {
+                buyReceived[i] = received;
+                emit RWATokensPurchased(buyAssets[i], buyAmounts[i], received);
+            } catch {
+                revert RWASwapFailed(buyAssets[i], buyAmounts[i]);
+            }
+            unchecked { ++i; }
         }
     }
 
