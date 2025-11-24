@@ -1,0 +1,71 @@
+# Paimon Yield Protocol - Foundry Configuration
+# https://book.getfoundry.sh/reference/config/
+
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+# Solidity Compiler
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+
+# Remappings for dependencies
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts/contracts-upgradeable/",
+    "solmate/=lib/solmate/src/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+# EVM Configuration (BSC Compatible)
+evm_version = "paris"
+bytecode_hash = "none"
+
+# Testing
+ffi = false
+verbosity = 2
+fuzz = { runs = 256, max_test_rejects = 65536 }
+invariant = { runs = 256, depth = 15 }
+
+# Gas Reporting
+gas_reports = ["*"]
+gas_reports_ignore = []
+
+# Formatting
+fmt = { line_length = 120, tab_width = 4, bracket_spacing = true }
+
+# Documentation
+doc = { out = "docs" }
+
+# BSC Mainnet Profile
+[profile.bsc]
+optimizer_runs = 200
+via_ir = false
+evm_version = "paris"
+
+# BSC Testnet Profile
+[profile.bsc-testnet]
+optimizer_runs = 200
+via_ir = false
+evm_version = "paris"
+
+# CI Profile (more fuzz runs)
+[profile.ci]
+fuzz = { runs = 1024 }
+invariant = { runs = 1024, depth = 32 }
+
+# RPC Endpoints
+[rpc_endpoints]
+bsc_mainnet = "${BSC_MAINNET_RPC_URL}"
+bsc_testnet = "${BSC_TESTNET_RPC_URL}"
+localhost = "http://127.0.0.1:8545"
+
+# Etherscan API for verification
+[etherscan]
+bsc_mainnet = { key = "${BSCSCAN_API_KEY}", url = "https://api.bscscan.com/api" }
+bsc_testnet = { key = "${BSCSCAN_API_KEY}", url = "https://api-testnet.bscscan.com/api" }
