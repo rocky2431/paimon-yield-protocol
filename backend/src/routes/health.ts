@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync } from 'fastify';
 
 interface HealthResponse {
   status: 'ok' | 'error';
@@ -7,7 +7,8 @@ interface HealthResponse {
   uptime: number;
 }
 
-export const healthRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
+// eslint-disable-next-line @typescript-eslint/require-await
+export const healthRoutes: FastifyPluginAsync = async (server: FastifyInstance): Promise<void> => {
   server.get<{ Reply: HealthResponse }>(
     '/health',
     {
@@ -27,13 +28,13 @@ export const healthRoutes: FastifyPluginAsync = async (server: FastifyInstance) 
         },
       },
     },
-    async (_request, reply) => {
-      return reply.send({
-        status: 'ok',
+    () => {
+      return {
+        status: 'ok' as const,
         timestamp: new Date().toISOString(),
         version: '0.1.0',
         uptime: process.uptime(),
-      });
+      };
     }
   );
 };

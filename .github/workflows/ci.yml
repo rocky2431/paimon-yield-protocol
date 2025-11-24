@@ -1,0 +1,255 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  # =============================================================================
+  # Detect Changes
+  # =============================================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            contracts:
+              - 'contracts/**'
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+  # =============================================================================
+  # Smart Contracts (Foundry)
+  # =============================================================================
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true' || github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: contracts
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Check Foundry Version
+        run: |
+          forge --version
+          anvil --version
+          cast --version
+
+      - name: Install Dependencies
+        run: forge install
+
+      - name: Check Formatting
+        run: forge fmt --check
+
+      - name: Build Contracts
+        run: forge build --sizes
+
+      - name: Run Tests
+        run: forge test -vvv
+
+      - name: Run Tests with Gas Report
+        run: forge test --gas-report > gas-report.txt
+
+      - name: Upload Gas Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-report
+          path: contracts/gas-report.txt
+          retention-days: 30
+
+      - name: Check Contract Sizes
+        run: forge build --sizes 2>&1 | tee contract-sizes.txt
+
+      - name: Run Slither Analysis
+        uses: crytic/slither-action@v0.4.0
+        continue-on-error: true
+        with:
+          target: contracts
+          slither-args: --exclude-dependencies
+
+  # =============================================================================
+  # Frontend (Next.js)
+  # =============================================================================
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type Check
+        run: pnpm type-check
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: ${{ secrets.WALLET_CONNECT_PROJECT_ID || 'test-project-id' }}
+          NEXT_PUBLIC_PNGY_VAULT_ADDRESS: '0x0000000000000000000000000000000000000000'
+          NEXT_PUBLIC_API_URL: 'http://localhost:3001'
+
+      - name: Run Tests
+        run: pnpm test --passWithNoTests
+
+  # =============================================================================
+  # Backend (Fastify)
+  # =============================================================================
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: paimon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Run Database Migrations
+        run: pnpm db:push
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/paimon_test?schema=public
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run Tests
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/paimon_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+
+      - name: Run Tests with Coverage
+        run: pnpm test:coverage
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/paimon_test?schema=public
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          retention-days: 30
+
+  # =============================================================================
+  # Summary
+  # =============================================================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [contracts, frontend, backend]
+    if: always()
+    steps:
+      - name: Check Results
+        run: |
+          if [[ "${{ needs.contracts.result }}" == "failure" ]] || \
+             [[ "${{ needs.frontend.result }}" == "failure" ]] || \
+             [[ "${{ needs.backend.result }}" == "failure" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All CI checks passed!"

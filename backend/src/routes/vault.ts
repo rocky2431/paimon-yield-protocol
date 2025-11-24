@@ -18,7 +18,8 @@ interface Transaction {
   txHash: string;
 }
 
-export const vaultRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
+// eslint-disable-next-line @typescript-eslint/require-await
+export const vaultRoutes: FastifyPluginAsync = async (server: FastifyInstance): Promise<void> => {
   // Get vault statistics
   server.get<{ Reply: VaultStats }>(
     '/stats',
@@ -40,15 +41,15 @@ export const vaultRoutes: FastifyPluginAsync = async (server: FastifyInstance) =
         },
       },
     },
-    async (_request, reply) => {
+    () => {
       // TODO: Fetch from database/blockchain
-      return reply.send({
+      return {
         totalAssets: '0',
         totalShares: '0',
         sharePrice: '1000000000000000000', // 1e18
         apy: '0',
         lastUpdated: new Date().toISOString(),
-      });
+      };
     }
   );
 
@@ -85,9 +86,9 @@ export const vaultRoutes: FastifyPluginAsync = async (server: FastifyInstance) =
         },
       },
     },
-    async (_request, reply) => {
+    () => {
       // TODO: Fetch from database
-      return reply.send([]);
+      return [];
     }
   );
 
@@ -106,9 +107,9 @@ export const vaultRoutes: FastifyPluginAsync = async (server: FastifyInstance) =
         },
       },
     },
-    async (_request, reply) => {
+    () => {
       // TODO: Fetch from database
-      return reply.send([]);
+      return [];
     }
   );
 };

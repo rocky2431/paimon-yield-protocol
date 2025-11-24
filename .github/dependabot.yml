@@ -1,0 +1,80 @@
+# Dependabot Configuration
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Frontend Dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(frontend)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      next:
+        patterns:
+          - "next*"
+          - "eslint-config-next"
+      web3:
+        patterns:
+          - "wagmi"
+          - "viem"
+          - "@rainbow-me/*"
+          - "@tanstack/*"
+
+  # Backend Dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(backend)"
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      fastify:
+        patterns:
+          - "fastify"
+          - "@fastify/*"
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+
+  # Smart Contracts (Foundry/Git Submodules)
+  - package-ecosystem: "gitsubmodule"
+    directory: "/contracts"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(contracts)"
+    labels:
+      - "dependencies"
+      - "contracts"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(actions)"
+    labels:
+      - "dependencies"
+      - "ci"

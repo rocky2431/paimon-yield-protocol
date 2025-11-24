@@ -178,7 +178,7 @@ workers.forEach((worker) => {
 // Start/Stop Workers
 // =============================================================================
 
-export async function startWorkers() {
+export function startWorkers(): void {
   console.warn('[Workers] Starting all workers...');
   // Workers start automatically when created
   // This function is for explicit initialization if needed
