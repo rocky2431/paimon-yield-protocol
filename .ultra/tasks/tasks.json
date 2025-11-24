@@ -120,7 +120,7 @@
       "priority": "P0",
       "dependencies": ["2", "3", "4"],
       "estimated_days": 2,
-      "status": "pending",
+      "status": "completed",
       "type": "architecture",
       "trace_to": "specs/architecture.md#9-testing-strategy"
     },
