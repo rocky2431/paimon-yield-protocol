@@ -60,7 +60,7 @@
       "priority": "P0",
       "dependencies": ["4"],
       "estimated_days": 1.5,
-      "status": "pending",
+      "status": "in_progress",
       "type": "architecture",
       "trace_to": "specs/architecture.md#34-database-stack"
     },

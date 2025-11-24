@@ -1,0 +1,162 @@
+// Paimon Yield Protocol - Prisma Schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// User Management
+// =============================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  address       String   @unique @db.VarChar(42) // Ethereum address
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  transactions  Transaction[]
+  positions     UserPosition[]
+
+  @@index([address])
+}
+
+// =============================================================================
+// Vault Transactions
+// =============================================================================
+
+model Transaction {
+  id            String          @id @default(cuid())
+  txHash        String          @unique @db.VarChar(66)
+  type          TransactionType
+  userAddress   String          @db.VarChar(42)
+  amount        Decimal         @db.Decimal(78, 0) // Wei precision
+  shares        Decimal         @db.Decimal(78, 0) // Wei precision
+  sharePrice    Decimal         @db.Decimal(78, 0) // Wei precision at time of tx
+  blockNumber   BigInt
+  timestamp     DateTime
+  createdAt     DateTime        @default(now())
+
+  // Relations
+  user          User            @relation(fields: [userAddress], references: [address])
+
+  @@index([userAddress])
+  @@index([type])
+  @@index([timestamp])
+  @@index([blockNumber])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAW
+}
+
+// =============================================================================
+// User Positions (Current Holdings)
+// =============================================================================
+
+model UserPosition {
+  id            String   @id @default(cuid())
+  userAddress   String   @unique @db.VarChar(42)
+  shares        Decimal  @db.Decimal(78, 0) // Current PNGY balance
+  costBasis     Decimal  @db.Decimal(78, 0) // Total USDT deposited
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User     @relation(fields: [userAddress], references: [address])
+
+  @@index([userAddress])
+}
+
+// =============================================================================
+// Net Asset Value History
+// =============================================================================
+
+model NetValue {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @unique
+  totalAssets   Decimal  @db.Decimal(78, 0) // Total USDT in vault
+  totalShares   Decimal  @db.Decimal(78, 0) // Total PNGY supply
+  sharePrice    Decimal  @db.Decimal(78, 0) // NAV per share (1e18 precision)
+  blockNumber   BigInt
+  createdAt     DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([blockNumber])
+}
+
+// =============================================================================
+// Rebalance History
+// =============================================================================
+
+model RebalanceHistory {
+  id            String          @id @default(cuid())
+  txHash        String          @unique @db.VarChar(66)
+  type          RebalanceType
+  fromAsset     String          @db.VarChar(42) // Token address
+  toAsset       String          @db.VarChar(42) // Token address
+  fromAmount    Decimal         @db.Decimal(78, 0)
+  toAmount      Decimal         @db.Decimal(78, 0)
+  blockNumber   BigInt
+  timestamp     DateTime
+  createdAt     DateTime        @default(now())
+
+  @@index([timestamp])
+  @@index([type])
+}
+
+enum RebalanceType {
+  BUY           // Buy RWA token
+  SELL          // Sell RWA token
+  REBALANCE     // Portfolio rebalancing
+}
+
+// =============================================================================
+// RWA Asset Allocations
+// =============================================================================
+
+model AssetAllocation {
+  id            String   @id @default(cuid())
+  tokenAddress  String   @unique @db.VarChar(42)
+  tokenSymbol   String   @db.VarChar(20)
+  tokenName     String   @db.VarChar(100)
+  allocation    Decimal  @db.Decimal(5, 4) // Percentage (0.0000 - 1.0000)
+  balance       Decimal  @db.Decimal(78, 0) // Token balance
+  valueUsd      Decimal  @db.Decimal(78, 0) // USD value
+  apy           Decimal  @db.Decimal(10, 6) // Annual yield
+  isActive      Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([tokenSymbol])
+}
+
+// =============================================================================
+// Oracle Price Feeds
+// =============================================================================
+
+model PriceFeed {
+  id            String      @id @default(cuid())
+  tokenAddress  String      @db.VarChar(42)
+  price         Decimal     @db.Decimal(78, 0) // Price in USD (1e18 precision)
+  source        OracleSource
+  blockNumber   BigInt
+  timestamp     DateTime
+  createdAt     DateTime    @default(now())
+
+  @@unique([tokenAddress, timestamp])
+  @@index([tokenAddress])
+  @@index([timestamp])
+}
+
+enum OracleSource {
+  APRO          // API3 APRO Oracle
+  CHAINLINK     // Chainlink fallback
+  MANUAL        // Manual override (emergency)
+}
