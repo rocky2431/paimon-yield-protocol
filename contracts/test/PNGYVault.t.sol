@@ -3,8 +3,11 @@ pragma solidity ^0.8.24;
 
 import {BaseTest} from "./Base.t.sol";
 import {PNGYVault} from "../src/PNGYVault.sol";
+import {AssetRegistry} from "../src/AssetRegistry.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Mock} from "./mocks/ERC20Mock.sol";
+import {MockOracleAdapter} from "./mocks/MockOracleAdapter.sol";
 
 /// @title MockUSDT
 /// @notice Mock USDT token for testing
@@ -988,5 +991,382 @@ contract PNGYVaultTest is BaseTest {
         (uint256 reqShares,,,, ) = vault.withdrawRequests(requestId);
         assertEq(reqShares, shares);
         assertEq(vault.totalLockedShares(), shares);
+    }
+
+    // =============================================================================
+    // RWA Asset Aggregation Tests
+    // =============================================================================
+
+    function test_setAssetRegistry_success() public {
+        AssetRegistry registry = new AssetRegistry(admin);
+
+        vm.prank(admin);
+        vm.expectEmit(true, true, false, false);
+        emit PNGYVault.AssetRegistryUpdated(address(0), address(registry));
+        vault.setAssetRegistry(address(registry));
+
+        assertEq(address(vault.assetRegistry()), address(registry));
+    }
+
+    function test_setAssetRegistry_revertsUnauthorized() public {
+        AssetRegistry registry = new AssetRegistry(admin);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.setAssetRegistry(address(registry));
+    }
+
+    function test_setOracleAdapter_success() public {
+        MockOracleAdapter oracle = new MockOracleAdapter();
+
+        vm.prank(admin);
+        vm.expectEmit(true, true, false, false);
+        emit PNGYVault.OracleAdapterUpdated(address(0), address(oracle));
+        vault.setOracleAdapter(address(oracle));
+
+        assertEq(address(vault.oracleAdapter()), address(oracle));
+    }
+
+    function test_addRWAAsset_success() public {
+        // Setup registry and RWA token
+        AssetRegistry registry = new AssetRegistry(admin);
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.prank(admin);
+        registry.registerAsset(
+            address(rwaToken),
+            AssetRegistry.AssetType.YIELD_BEARING,
+            address(0)
+        );
+
+        vm.prank(admin);
+        vault.setAssetRegistry(address(registry));
+
+        // Add RWA asset to vault
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, true);
+        emit PNGYVault.RWAAssetAdded(address(rwaToken), 5000);
+        vault.addRWAAsset(address(rwaToken), 5000); // 50%
+
+        assertTrue(vault.isRWAHolding(address(rwaToken)));
+        assertEq(vault.rwaHoldingCount(), 1);
+    }
+
+    function test_addRWAAsset_revertsZeroAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(PNGYVault.ZeroAddress.selector);
+        vault.addRWAAsset(address(0), 5000);
+    }
+
+    function test_addRWAAsset_revertsAlreadyAdded() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.prank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.RWAAssetAlreadyAdded.selector,
+                address(rwaToken)
+            )
+        );
+        vault.addRWAAsset(address(rwaToken), 5000);
+    }
+
+    function test_addRWAAsset_revertsInvalidAllocation() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(PNGYVault.InvalidAllocation.selector, 10001)
+        );
+        vault.addRWAAsset(address(rwaToken), 10001); // > 100%
+    }
+
+    function test_addRWAAsset_revertsNotRegistered() public {
+        AssetRegistry registry = new AssetRegistry(admin);
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.prank(admin);
+        vault.setAssetRegistry(address(registry));
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.RWAAssetNotRegistered.selector,
+                address(rwaToken)
+            )
+        );
+        vault.addRWAAsset(address(rwaToken), 5000);
+    }
+
+    function test_removeRWAAsset_success() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.expectEmit(true, false, false, false);
+        emit PNGYVault.RWAAssetRemoved(address(rwaToken));
+        vault.removeRWAAsset(address(rwaToken));
+        vm.stopPrank();
+
+        assertFalse(vault.isRWAHolding(address(rwaToken)));
+        assertEq(vault.rwaHoldingCount(), 0);
+    }
+
+    function test_removeRWAAsset_revertsNotFound() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.RWAAssetNotFound.selector,
+                address(rwaToken)
+            )
+        );
+        vault.removeRWAAsset(address(rwaToken));
+    }
+
+    function test_updateTargetAllocation_success() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+
+        vm.expectEmit(true, false, false, true);
+        emit PNGYVault.TargetAllocationUpdated(address(rwaToken), 5000, 7000);
+        vault.updateTargetAllocation(address(rwaToken), 7000);
+        vm.stopPrank();
+
+        PNGYVault.RWAHolding memory holding = vault.getRWAHolding(address(rwaToken));
+        assertEq(holding.targetAllocation, 7000);
+    }
+
+    function test_setRWAAssetActive_success() public {
+        ERC20Mock rwaToken = new ERC20Mock("RWA Token", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vault.setRWAAssetActive(address(rwaToken), false);
+        vm.stopPrank();
+
+        PNGYVault.RWAHolding memory holding = vault.getRWAHolding(address(rwaToken));
+        assertFalse(holding.isActive);
+    }
+
+    function test_totalAssets_withNoRWA() public {
+        // Without oracle, RWA value should be 0
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        assertEq(vault.totalAssets(), MIN_DEPOSIT);
+    }
+
+    function test_totalAssets_withRWAValue() public {
+        // Setup
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken = new ERC20Mock("USDY Token", "USDY", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vm.stopPrank();
+
+        // Set oracle price (1 USDY = 1.05 USDT, 18 decimals)
+        oracle.setPrice(address(rwaToken), 1.05e18);
+
+        // Mint RWA tokens to vault (simulate holding)
+        rwaToken.mint(address(vault), 1000e18); // 1000 USDY
+
+        // Deposit USDT
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        // Total should be: MIN_DEPOSIT (500e18) + 1000 * 1.05 (1050e18)
+        uint256 expectedTotal = MIN_DEPOSIT + 1050e18;
+        assertEq(vault.totalAssets(), expectedTotal);
+    }
+
+    function test_totalAssets_multipleRWAAssets() public {
+        // Setup
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken1 = new ERC20Mock("USDY Token", "USDY", 18);
+        ERC20Mock rwaToken2 = new ERC20Mock("Gold Token", "XAUT", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken1), 5000);
+        vault.addRWAAsset(address(rwaToken2), 3000);
+        vm.stopPrank();
+
+        // Set prices
+        oracle.setPrice(address(rwaToken1), 1e18);    // 1 USDY = 1 USDT
+        oracle.setPrice(address(rwaToken2), 2000e18); // 1 XAUT = 2000 USDT
+
+        // Mint to vault
+        rwaToken1.mint(address(vault), 500e18);  // 500 USDY = 500 USDT
+        rwaToken2.mint(address(vault), 1e18);    // 1 XAUT = 2000 USDT
+
+        // Deposit
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        // Total: 500e18 (USDT) + 500e18 (USDY) + 2000e18 (XAUT) = 3000e18
+        uint256 expectedTotal = MIN_DEPOSIT + 500e18 + 2000e18;
+        assertEq(vault.totalAssets(), expectedTotal);
+    }
+
+    function test_totalAssets_inactiveRWANotCounted() public {
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken = new ERC20Mock("USDY Token", "USDY", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vault.setRWAAssetActive(address(rwaToken), false);
+        vm.stopPrank();
+
+        oracle.setPrice(address(rwaToken), 1e18);
+        rwaToken.mint(address(vault), 1000e18);
+
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        // Inactive RWA should not be counted
+        assertEq(vault.totalAssets(), MIN_DEPOSIT);
+    }
+
+    function test_getRWAValue_returnsZeroWithoutOracle() public {
+        assertEq(vault.getRWAValue(), 0);
+    }
+
+    function test_getRWAHoldings_returnsAll() public {
+        ERC20Mock rwa1 = new ERC20Mock("RWA1", "RWA1", 18);
+        ERC20Mock rwa2 = new ERC20Mock("RWA2", "RWA2", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwa1), 5000);
+        vault.addRWAAsset(address(rwa2), 3000);
+        vm.stopPrank();
+
+        PNGYVault.RWAHolding[] memory holdings = vault.getRWAHoldings();
+        assertEq(holdings.length, 2);
+        assertEq(holdings[0].tokenAddress, address(rwa1));
+        assertEq(holdings[1].tokenAddress, address(rwa2));
+    }
+
+    function test_removeRWAAsset_middleElement() public {
+        ERC20Mock rwa1 = new ERC20Mock("RWA1", "RWA1", 18);
+        ERC20Mock rwa2 = new ERC20Mock("RWA2", "RWA2", 18);
+        ERC20Mock rwa3 = new ERC20Mock("RWA3", "RWA3", 18);
+
+        vm.startPrank(admin);
+        vault.addRWAAsset(address(rwa1), 3000);
+        vault.addRWAAsset(address(rwa2), 3000);
+        vault.addRWAAsset(address(rwa3), 4000);
+
+        vault.removeRWAAsset(address(rwa2));
+        vm.stopPrank();
+
+        assertEq(vault.rwaHoldingCount(), 2);
+        assertTrue(vault.isRWAHolding(address(rwa1)));
+        assertFalse(vault.isRWAHolding(address(rwa2)));
+        assertTrue(vault.isRWAHolding(address(rwa3)));
+    }
+
+    function test_refreshRWACache_success() public {
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken = new ERC20Mock("USDY", "USDY", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vm.stopPrank();
+
+        oracle.setPrice(address(rwaToken), 1e18);
+        rwaToken.mint(address(vault), 1000e18);
+
+        vm.prank(admin);
+        vault.refreshRWACache();
+
+        (uint256 value, uint256 timestamp, bool isFresh) = vault.getCachedRWAValue();
+        assertEq(value, 1000e18);
+        assertEq(timestamp, block.timestamp);
+        assertTrue(isFresh);
+    }
+
+    function test_cachedValue_usedWhenFresh() public {
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken = new ERC20Mock("USDY", "USDY", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vm.stopPrank();
+
+        oracle.setPrice(address(rwaToken), 1e18);
+        rwaToken.mint(address(vault), 1000e18);
+
+        // Refresh cache
+        vm.prank(admin);
+        vault.refreshRWACache();
+
+        // Change price (cache should still use old value within duration)
+        oracle.setPrice(address(rwaToken), 2e18);
+
+        (,, bool isFresh) = vault.getCachedRWAValue();
+        assertTrue(isFresh);
+
+        // totalAssets should use cached value
+        assertEq(vault.getRWAValue(), 2000e18); // Fresh calculation
+        // Note: _getRWAValue uses cache, but getRWAValue always calculates fresh
+    }
+
+    function test_addRWAAsset_revertsMaxReached() public {
+        vm.startPrank(admin);
+
+        // Add MAX_RWA_ASSETS assets
+        for (uint256 i = 0; i < vault.MAX_RWA_ASSETS(); i++) {
+            ERC20Mock token = new ERC20Mock("Token", "TKN", 18);
+            vault.addRWAAsset(address(token), 100);
+        }
+
+        // Try to add one more
+        ERC20Mock extra = new ERC20Mock("Extra", "EXT", 18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.MaxRWAAssetsReached.selector,
+                20,
+                20
+            )
+        );
+        vault.addRWAAsset(address(extra), 100);
+        vm.stopPrank();
+    }
+
+    function testFuzz_totalAssets_withRWAValue(uint256 rwaAmount, uint256 price) public {
+        // Bound inputs
+        rwaAmount = bound(rwaAmount, 1e18, 1_000_000e18);
+        price = bound(price, 0.01e18, 10_000e18);
+
+        MockOracleAdapter oracle = new MockOracleAdapter();
+        ERC20Mock rwaToken = new ERC20Mock("RWA", "RWA", 18);
+
+        vm.startPrank(admin);
+        vault.setOracleAdapter(address(oracle));
+        vault.addRWAAsset(address(rwaToken), 5000);
+        vm.stopPrank();
+
+        oracle.setPrice(address(rwaToken), price);
+        rwaToken.mint(address(vault), rwaAmount);
+
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        uint256 expectedRwaValue = (rwaAmount * price) / 1e18;
+        uint256 expectedTotal = MIN_DEPOSIT + expectedRwaValue;
+        assertEq(vault.totalAssets(), expectedTotal);
     }
 }

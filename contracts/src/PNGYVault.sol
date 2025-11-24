@@ -4,11 +4,14 @@ pragma solidity ^0.8.24;
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IAssetRegistry} from "./interfaces/IAssetRegistry.sol";
+import {IOracleAdapter} from "./interfaces/IOracleAdapter.sol";
 
 /// @title PNGYVault
 /// @author Paimon Yield Protocol
@@ -43,6 +46,12 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Instant withdrawal threshold (10,000 USDT)
     uint256 public constant INSTANT_WITHDRAWAL_LIMIT = 10_000e18;
 
+    /// @notice Cache duration for RWA value calculation (5 minutes)
+    uint256 public constant CACHE_DURATION = 5 minutes;
+
+    /// @notice Maximum number of RWA assets in vault
+    uint256 public constant MAX_RWA_ASSETS = 20;
+
     // =============================================================================
     // Structs
     // =============================================================================
@@ -54,6 +63,19 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         address receiver;
         uint256 requestTime;
         bool claimed;
+    }
+
+    /// @notice RWA asset holding in the vault
+    struct RWAHolding {
+        address tokenAddress;     // RWA token address
+        uint256 targetAllocation; // Target allocation in basis points (10000 = 100%)
+        bool isActive;            // Whether this holding is active
+    }
+
+    /// @notice Cached total assets value
+    struct CachedValue {
+        uint256 value;
+        uint256 timestamp;
     }
 
     // =============================================================================
@@ -80,6 +102,21 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
     /// @notice Total shares locked in pending withdrawal requests
     uint256 public totalLockedShares;
+
+    /// @notice Asset registry contract
+    IAssetRegistry public assetRegistry;
+
+    /// @notice Oracle adapter for price feeds
+    IOracleAdapter public oracleAdapter;
+
+    /// @notice Array of RWA holdings in the vault
+    RWAHolding[] private _rwaHoldings;
+
+    /// @notice Mapping from token address to holding index + 1 (0 means not found)
+    mapping(address => uint256) private _holdingIndex;
+
+    /// @notice Cached total RWA value for gas optimization
+    CachedValue private _cachedRwaValue;
 
     // =============================================================================
     // Events
@@ -126,6 +163,21 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         uint256 assets
     );
 
+    /// @notice Emitted when an RWA asset is added to the vault
+    event RWAAssetAdded(address indexed tokenAddress, uint256 targetAllocation);
+
+    /// @notice Emitted when an RWA asset is removed from the vault
+    event RWAAssetRemoved(address indexed tokenAddress);
+
+    /// @notice Emitted when target allocation is updated
+    event TargetAllocationUpdated(address indexed tokenAddress, uint256 oldAllocation, uint256 newAllocation);
+
+    /// @notice Emitted when asset registry is updated
+    event AssetRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+
+    /// @notice Emitted when oracle adapter is updated
+    event OracleAdapterUpdated(address indexed oldOracle, address indexed newOracle);
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -163,6 +215,24 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Thrown when insufficient shares for withdrawal
     error InsufficientShares(uint256 available, uint256 required);
 
+    /// @notice Thrown when RWA asset is already in vault
+    error RWAAssetAlreadyAdded(address tokenAddress);
+
+    /// @notice Thrown when RWA asset is not in vault
+    error RWAAssetNotFound(address tokenAddress);
+
+    /// @notice Thrown when RWA asset not registered in registry
+    error RWAAssetNotRegistered(address tokenAddress);
+
+    /// @notice Thrown when maximum RWA assets reached
+    error MaxRWAAssetsReached(uint256 current, uint256 max);
+
+    /// @notice Thrown when allocation exceeds 100%
+    error InvalidAllocation(uint256 allocation);
+
+    /// @notice Thrown when oracle or registry not configured
+    error NotConfigured();
+
     // =============================================================================
     // Constructor
     // =============================================================================
@@ -193,11 +263,79 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     // =============================================================================
 
     /// @notice Returns the total amount of underlying assets managed by the vault
-    /// @dev Includes both idle assets and RWA assets
+    /// @dev Includes idle assets + legacy managed assets + aggregated RWA holdings
     /// @return Total assets in the vault
     function totalAssets() public view override returns (uint256) {
-        // Idle assets in vault + managed RWA assets
-        return IERC20(asset()).balanceOf(address(this)) + _totalManagedAssets;
+        // Idle assets in vault
+        uint256 idleAssets = IERC20(asset()).balanceOf(address(this));
+
+        // Legacy managed assets (for backwards compatibility)
+        uint256 legacyManaged = _totalManagedAssets;
+
+        // Aggregated RWA holdings value
+        uint256 rwaValue = _getRWAValue();
+
+        return idleAssets + legacyManaged + rwaValue;
+    }
+
+    /// @notice Get the aggregated value of all RWA holdings
+    /// @dev Uses caching for gas optimization, returns cached value if fresh
+    /// @return Total value of RWA holdings in underlying asset terms
+    function _getRWAValue() internal view returns (uint256) {
+        // If no oracle configured, return 0 (RWA tracking disabled)
+        if (address(oracleAdapter) == address(0)) {
+            return 0;
+        }
+
+        // Check if cached value is still fresh (and was actually set)
+        if (_cachedRwaValue.timestamp != 0 &&
+            _cachedRwaValue.timestamp + CACHE_DURATION > block.timestamp) {
+            return _cachedRwaValue.value;
+        }
+
+        // Calculate fresh value
+        return _calculateRWAValue();
+    }
+
+    /// @notice Calculate the total value of all RWA holdings
+    /// @dev Iterates through holdings, fetches prices from oracle, converts to asset terms
+    /// @return totalValue Total value in underlying asset (e.g., USDT) terms
+    function _calculateRWAValue() internal view returns (uint256 totalValue) {
+        uint256 length = _rwaHoldings.length;
+        uint8 assetDecimals = IERC20Metadata(asset()).decimals();
+
+        for (uint256 i = 0; i < length;) {
+            RWAHolding memory holding = _rwaHoldings[i];
+
+            if (holding.isActive) {
+                // Get token balance held by vault
+                uint256 balance = IERC20(holding.tokenAddress).balanceOf(address(this));
+
+                if (balance > 0) {
+                    // Get price from oracle (18 decimals)
+                    uint256 price = oracleAdapter.getPrice(holding.tokenAddress);
+
+                    // Get token decimals
+                    uint8 tokenDecimals = IERC20Metadata(holding.tokenAddress).decimals();
+
+                    // Calculate value: balance * price / 10^tokenDecimals
+                    // Result is in 18 decimals (price decimals)
+                    // Then normalize to asset decimals
+                    uint256 value = (balance * price) / (10 ** tokenDecimals);
+
+                    // Normalize to asset decimals if needed
+                    if (assetDecimals < 18) {
+                        value = value / (10 ** (18 - assetDecimals));
+                    } else if (assetDecimals > 18) {
+                        value = value * (10 ** (assetDecimals - 18));
+                    }
+
+                    totalValue += value;
+                }
+            }
+
+            unchecked { ++i; }
+        }
     }
 
     /// @notice Returns the maximum amount that can be deposited
@@ -476,6 +614,128 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         emit EmergencyModeChanged(enabled);
     }
 
+    /// @notice Set the asset registry contract
+    /// @dev Only callable by admin role
+    /// @param registry_ The new asset registry address
+    function setAssetRegistry(address registry_) external onlyRole(ADMIN_ROLE) {
+        address oldRegistry = address(assetRegistry);
+        assetRegistry = IAssetRegistry(registry_);
+        emit AssetRegistryUpdated(oldRegistry, registry_);
+    }
+
+    /// @notice Set the oracle adapter contract
+    /// @dev Only callable by admin role
+    /// @param oracle_ The new oracle adapter address
+    function setOracleAdapter(address oracle_) external onlyRole(ADMIN_ROLE) {
+        address oldOracle = address(oracleAdapter);
+        oracleAdapter = IOracleAdapter(oracle_);
+        emit OracleAdapterUpdated(oldOracle, oracle_);
+    }
+
+    /// @notice Add an RWA asset to the vault holdings
+    /// @dev Only callable by admin role. Asset must be registered in AssetRegistry.
+    /// @param tokenAddress The RWA token address
+    /// @param targetAllocation Target allocation in basis points (10000 = 100%)
+    function addRWAAsset(
+        address tokenAddress,
+        uint256 targetAllocation
+    ) external onlyRole(ADMIN_ROLE) {
+        if (tokenAddress == address(0)) revert ZeroAddress();
+        if (_holdingIndex[tokenAddress] != 0) revert RWAAssetAlreadyAdded(tokenAddress);
+        if (_rwaHoldings.length >= MAX_RWA_ASSETS) {
+            revert MaxRWAAssetsReached(_rwaHoldings.length, MAX_RWA_ASSETS);
+        }
+        if (targetAllocation > 10000) revert InvalidAllocation(targetAllocation);
+
+        // Verify asset is registered in registry (if registry is configured)
+        if (address(assetRegistry) != address(0)) {
+            if (!assetRegistry.isRegistered(tokenAddress)) {
+                revert RWAAssetNotRegistered(tokenAddress);
+            }
+        }
+
+        _rwaHoldings.push(RWAHolding({
+            tokenAddress: tokenAddress,
+            targetAllocation: targetAllocation,
+            isActive: true
+        }));
+
+        _holdingIndex[tokenAddress] = _rwaHoldings.length; // 1-indexed
+
+        // Invalidate cache
+        _cachedRwaValue.timestamp = 0;
+
+        emit RWAAssetAdded(tokenAddress, targetAllocation);
+    }
+
+    /// @notice Remove an RWA asset from vault holdings
+    /// @dev Only callable by admin role
+    /// @param tokenAddress The RWA token address to remove
+    function removeRWAAsset(address tokenAddress) external onlyRole(ADMIN_ROLE) {
+        uint256 index = _holdingIndex[tokenAddress];
+        if (index == 0) revert RWAAssetNotFound(tokenAddress);
+
+        uint256 actualIndex = index - 1;
+        uint256 lastIndex = _rwaHoldings.length - 1;
+
+        // Move last element to removed position (if not already last)
+        if (actualIndex != lastIndex) {
+            RWAHolding memory lastHolding = _rwaHoldings[lastIndex];
+            _rwaHoldings[actualIndex] = lastHolding;
+            _holdingIndex[lastHolding.tokenAddress] = index;
+        }
+
+        _rwaHoldings.pop();
+        delete _holdingIndex[tokenAddress];
+
+        // Invalidate cache
+        _cachedRwaValue.timestamp = 0;
+
+        emit RWAAssetRemoved(tokenAddress);
+    }
+
+    /// @notice Update target allocation for an RWA asset
+    /// @dev Only callable by admin role
+    /// @param tokenAddress The RWA token address
+    /// @param newAllocation New target allocation in basis points
+    function updateTargetAllocation(
+        address tokenAddress,
+        uint256 newAllocation
+    ) external onlyRole(ADMIN_ROLE) {
+        uint256 index = _holdingIndex[tokenAddress];
+        if (index == 0) revert RWAAssetNotFound(tokenAddress);
+        if (newAllocation > 10000) revert InvalidAllocation(newAllocation);
+
+        uint256 oldAllocation = _rwaHoldings[index - 1].targetAllocation;
+        _rwaHoldings[index - 1].targetAllocation = newAllocation;
+
+        emit TargetAllocationUpdated(tokenAddress, oldAllocation, newAllocation);
+    }
+
+    /// @notice Set RWA holding active status
+    /// @dev Only callable by admin role
+    /// @param tokenAddress The RWA token address
+    /// @param active Whether the holding is active
+    function setRWAAssetActive(
+        address tokenAddress,
+        bool active
+    ) external onlyRole(ADMIN_ROLE) {
+        uint256 index = _holdingIndex[tokenAddress];
+        if (index == 0) revert RWAAssetNotFound(tokenAddress);
+
+        _rwaHoldings[index - 1].isActive = active;
+
+        // Invalidate cache
+        _cachedRwaValue.timestamp = 0;
+    }
+
+    /// @notice Refresh the cached RWA value
+    /// @dev Only callable by rebalancer role. Called after rebalancing operations.
+    function refreshRWACache() external onlyRole(REBALANCER_ROLE) {
+        _cachedRwaValue.value = _calculateRWAValue();
+        _cachedRwaValue.timestamp = block.timestamp;
+    }
+
     // =============================================================================
     // View Functions
     // =============================================================================
@@ -492,6 +752,56 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @return Total managed assets
     function managedAssets() external view returns (uint256) {
         return _totalManagedAssets;
+    }
+
+    /// @notice Get all RWA holdings
+    /// @return Array of RWA holdings
+    function getRWAHoldings() external view returns (RWAHolding[] memory) {
+        return _rwaHoldings;
+    }
+
+    /// @notice Get specific RWA holding by token address
+    /// @param tokenAddress The token address
+    /// @return The RWA holding data
+    function getRWAHolding(address tokenAddress) external view returns (RWAHolding memory) {
+        uint256 index = _holdingIndex[tokenAddress];
+        if (index == 0) revert RWAAssetNotFound(tokenAddress);
+        return _rwaHoldings[index - 1];
+    }
+
+    /// @notice Get the number of RWA holdings
+    /// @return Count of RWA holdings
+    function rwaHoldingCount() external view returns (uint256) {
+        return _rwaHoldings.length;
+    }
+
+    /// @notice Check if an RWA asset is in vault holdings
+    /// @param tokenAddress The token address to check
+    /// @return True if asset is in holdings
+    function isRWAHolding(address tokenAddress) external view returns (bool) {
+        return _holdingIndex[tokenAddress] != 0;
+    }
+
+    /// @notice Get the current aggregated RWA value (fresh calculation)
+    /// @return Total RWA value in underlying asset terms
+    function getRWAValue() external view returns (uint256) {
+        if (address(oracleAdapter) == address(0)) {
+            return 0;
+        }
+        return _calculateRWAValue();
+    }
+
+    /// @notice Get cached RWA value info
+    /// @return value Cached value
+    /// @return timestamp When cached
+    /// @return isFresh Whether cache is still valid
+    function getCachedRWAValue() external view returns (uint256 value, uint256 timestamp, bool isFresh) {
+        return (
+            _cachedRwaValue.value,
+            _cachedRwaValue.timestamp,
+            _cachedRwaValue.timestamp != 0 &&
+                _cachedRwaValue.timestamp + CACHE_DURATION > block.timestamp
+        );
     }
 
     // =============================================================================
