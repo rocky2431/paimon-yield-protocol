@@ -1,0 +1,17 @@
+{
+  "name": "@paimon/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paimon Yield Protocol Smart Contracts",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "test:gas": "forge test --gas-report",
+    "coverage": "forge coverage",
+    "clean": "forge clean",
+    "lint": "solhint 'src/**/*.sol' 'test/**/*.sol'",
+    "deploy:testnet": "forge script script/Deploy.s.sol --rpc-url bsc-testnet --broadcast",
+    "deploy:mainnet": "forge script script/Deploy.s.sol --rpc-url bsc-mainnet --broadcast"
+  },
+  "devDependencies": {}
+}

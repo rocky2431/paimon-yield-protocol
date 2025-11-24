@@ -12,7 +12,7 @@
       "priority": "P0",
       "dependencies": [],
       "estimated_days": 0.5,
-      "status": "pending",
+      "status": "in_progress",
       "type": "architecture",
       "trace_to": "specs/architecture.md#3-technology-stack"
     },
