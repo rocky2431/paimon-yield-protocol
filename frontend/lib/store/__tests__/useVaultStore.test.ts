@@ -139,4 +139,49 @@ describe('useVaultStore', () => {
       expect(result.current.error).toBeNull();
     });
   });
+
+  describe('Dashboard actions', () => {
+    describe('setDashboardData', () => {
+      it('should update dashboard data correctly', () => {
+        const { result } = renderHook(() => useVaultStore());
+
+        act(() => {
+          result.current.setDashboardData(
+            BigInt('10000000000000000000000'), // 10000 USDT
+            BigInt('500000000000000000000'),   // 500 USDT yield
+            5.26                                // 5.26% APY
+          );
+        });
+
+        expect(result.current.userAssetValue).toBe(BigInt('10000000000000000000000'));
+        expect(result.current.accumulatedYield).toBe(BigInt('500000000000000000000'));
+        expect(result.current.currentApy).toBe(5.26);
+      });
+    });
+
+    describe('setInitialDeposit', () => {
+      it('should set initial deposit amount', () => {
+        const { result } = renderHook(() => useVaultStore());
+
+        act(() => {
+          result.current.setInitialDeposit(BigInt('5000000000000000000000')); // 5000 USDT
+        });
+
+        expect(result.current.initialDeposit).toBe(BigInt('5000000000000000000000'));
+      });
+    });
+
+    describe('setLastUpdated', () => {
+      it('should set last updated timestamp', () => {
+        const { result } = renderHook(() => useVaultStore());
+        const now = new Date();
+
+        act(() => {
+          result.current.setLastUpdated(now);
+        });
+
+        expect(result.current.lastUpdated).toEqual(now);
+      });
+    });
+  });
 });
