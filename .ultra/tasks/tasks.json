@@ -228,7 +228,7 @@
       "priority": "P1",
       "dependencies": ["17"],
       "estimated_days": 2,
-      "status": "in_progress",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/architecture.md#82-smart-contract-performance"
     },
