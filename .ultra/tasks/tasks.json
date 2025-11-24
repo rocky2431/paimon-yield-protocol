@@ -480,7 +480,7 @@
       "priority": "P1",
       "dependencies": ["3"],
       "estimated_days": 2.5,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-21-查看历史收益曲线"
     },
