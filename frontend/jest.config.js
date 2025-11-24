@@ -18,11 +18,7 @@ const config = {
   // Transform files
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: {
-        jsx: 'react-jsx',
-        esModuleInterop: true,
-        moduleResolution: 'node',
-      },
+      tsconfig: 'tsconfig.test.json',
     }],
   },
 

@@ -46,7 +46,7 @@ mockIntersectionObserver.mockReturnValue({
   unobserve: () => null,
   disconnect: () => null,
 });
-window.IntersectionObserver = mockIntersectionObserver;
+window.IntersectionObserver = mockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // =============================================================================
 // Mock ResizeObserver
@@ -56,7 +56,7 @@ window.ResizeObserver = jest.fn().mockImplementation(() => ({
   observe: jest.fn(),
   unobserve: jest.fn(),
   disconnect: jest.fn(),
-}));
+})) as unknown as typeof ResizeObserver;
 
 // =============================================================================
 // Suppress console warnings in tests
