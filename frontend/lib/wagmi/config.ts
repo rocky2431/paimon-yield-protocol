@@ -1,20 +1,29 @@
-import { http, createConfig } from 'wagmi';
-import { bsc, bscTestnet } from 'wagmi/chains';
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { cookieStorage, createStorage } from '@wagmi/core';
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+import { bsc, bscTestnet } from '@reown/appkit/networks';
 
-// WalletConnect Project ID - Get yours at https://cloud.walletconnect.com
-const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'YOUR_PROJECT_ID';
+// WalletConnect Project ID - Get yours at https://cloud.reown.com
+export const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '';
 
-export const config = getDefaultConfig({
-  appName: 'Paimon Yield Protocol',
-  projectId,
-  chains: [bsc, bscTestnet],
-  transports: {
-    [bsc.id]: http('https://bsc-dataseed.binance.org'),
-    [bscTestnet.id]: http('https://data-seed-prebsc-1-s1.binance.org:8545'),
-  },
+if (!projectId) {
+  console.warn('NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is not set. Wallet connection may not work properly.');
+}
+
+// Supported networks
+export const networks = [bsc, bscTestnet] as const;
+
+// Create Wagmi Adapter for Reown AppKit
+export const wagmiAdapter = new WagmiAdapter({
+  storage: createStorage({
+    storage: cookieStorage,
+  }),
   ssr: true,
+  projectId,
+  networks: [...networks],
 });
+
+// Export the wagmi config for use with wagmi hooks
+export const config = wagmiAdapter.wagmiConfig;
 
 // Export chain configurations for easy access
 export const supportedChains = {
@@ -33,3 +42,11 @@ export const contracts = {
     usdt: '0x337610d27c682E347C9cD60BD4b3b107C9d34dDd' as const, // Testnet USDT
   },
 } as const;
+
+// App metadata for Reown AppKit
+export const metadata = {
+  name: 'Paimon Yield Protocol',
+  description: 'RWA Yield Aggregator on BSC',
+  url: typeof window !== 'undefined' ? window.location.origin : 'https://paimon.finance',
+  icons: ['/logo.png'],
+};

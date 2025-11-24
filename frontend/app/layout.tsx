@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { headers } from 'next/headers';
 import './globals.css';
 import { Providers } from './providers';
 
@@ -15,15 +16,19 @@ export const metadata: Metadata = {
   authors: [{ name: 'Paimon Finance' }],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Get cookies for SSR wallet state hydration
+  const headersList = await headers();
+  const cookies = headersList.get('cookie');
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers cookies={cookies}>{children}</Providers>
       </body>
     </html>
   );

@@ -18,9 +18,18 @@ const config = {
   // Transform files
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
+      tsconfig: {
+        jsx: 'react-jsx',
+        esModuleInterop: true,
+        moduleResolution: 'node',
+      },
     }],
   },
+
+  // Transform ignore patterns (allow certain node_modules to be transformed)
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@reown|wagmi|viem|@tanstack)/)',
+  ],
 
   // Test patterns
   testMatch: [
