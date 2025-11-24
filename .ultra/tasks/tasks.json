@@ -276,7 +276,7 @@
       "priority": "P0",
       "dependencies": ["2", "10"],
       "estimated_days": 3,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-65-测试-rwa-资产买卖流程"
     },
