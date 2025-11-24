@@ -432,7 +432,7 @@
       "priority": "P0",
       "dependencies": ["3", "41"],
       "estimated_days": 2.5,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-12-存入-usdt-获取-pngy"
     },
