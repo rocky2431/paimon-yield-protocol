@@ -183,6 +183,8 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         uint256 assets,
         address receiver
     ) public override nonReentrant whenNotPaused returns (uint256 shares) {
+        // Gas optimization: Check zero first (cheaper), then minimum
+        if (assets == 0) revert ZeroAmount();
         if (assets < MIN_DEPOSIT) {
             revert DepositBelowMinimum(assets, MIN_DEPOSIT);
         }

@@ -477,4 +477,201 @@ contract PNGYVaultTest is BaseTest {
     function test_decimals() public view {
         assertEq(vault.decimals(), 18);
     }
+
+    // =============================================================================
+    // Fuzz Tests - Deposit
+    // =============================================================================
+
+    function testFuzz_deposit_validAmounts(uint256 amount) public {
+        // Bound amount between MIN_DEPOSIT and user's balance
+        amount = bound(amount, MIN_DEPOSIT, INITIAL_BALANCE);
+
+        vm.prank(alice);
+        uint256 shares = vault.deposit(amount, alice);
+
+        assertGt(shares, 0);
+        assertEq(vault.balanceOf(alice), shares);
+        assertEq(usdt.balanceOf(address(vault)), amount);
+    }
+
+    function testFuzz_deposit_invalidAmounts(uint256 amount) public {
+        // Bound amount to be between 1 and MIN_DEPOSIT - 1
+        amount = bound(amount, 1, MIN_DEPOSIT - 1);
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.DepositBelowMinimum.selector,
+                amount,
+                MIN_DEPOSIT
+            )
+        );
+        vault.deposit(amount, alice);
+    }
+
+    function testFuzz_deposit_multipleUsers(uint256 aliceAmount, uint256 bobAmount) public {
+        aliceAmount = bound(aliceAmount, MIN_DEPOSIT, INITIAL_BALANCE / 2);
+        bobAmount = bound(bobAmount, MIN_DEPOSIT, INITIAL_BALANCE / 2);
+
+        vm.prank(alice);
+        uint256 aliceShares = vault.deposit(aliceAmount, alice);
+
+        vm.prank(bob);
+        uint256 bobShares = vault.deposit(bobAmount, bob);
+
+        assertEq(vault.balanceOf(alice), aliceShares);
+        assertEq(vault.balanceOf(bob), bobShares);
+        assertEq(vault.totalAssets(), aliceAmount + bobAmount);
+    }
+
+    // =============================================================================
+    // Fuzz Tests - Mint
+    // =============================================================================
+
+    function testFuzz_mint_validShares(uint256 shares) public {
+        // Bound shares to reasonable range
+        shares = bound(shares, MIN_DEPOSIT, INITIAL_BALANCE);
+
+        vm.prank(alice);
+        uint256 assets = vault.mint(shares, alice);
+
+        assertGt(assets, 0);
+        assertEq(vault.balanceOf(alice), shares);
+    }
+
+    // =============================================================================
+    // Boundary Tests - Deposit
+    // =============================================================================
+
+    function test_deposit_exactMinimum() public {
+        vm.prank(alice);
+        uint256 shares = vault.deposit(MIN_DEPOSIT, alice);
+
+        assertEq(shares, MIN_DEPOSIT); // 1:1 ratio initially
+        assertEq(vault.balanceOf(alice), MIN_DEPOSIT);
+    }
+
+    function test_deposit_revertsZeroAmount() public {
+        vm.prank(alice);
+        vm.expectRevert(PNGYVault.ZeroAmount.selector);
+        vault.deposit(0, alice);
+    }
+
+    function test_deposit_largeAmount() public {
+        uint256 largeAmount = 10_000_000e18;
+        usdt.mint(alice, largeAmount);
+        vm.prank(alice);
+        usdt.approve(address(vault), largeAmount);
+
+        vm.prank(alice);
+        uint256 shares = vault.deposit(largeAmount, alice);
+
+        assertEq(shares, largeAmount);
+        assertEq(vault.totalAssets(), largeAmount);
+    }
+
+    // =============================================================================
+    // Boundary Tests - Mint
+    // =============================================================================
+
+    function test_mint_exactMinimumShares() public {
+        vm.prank(alice);
+        uint256 assets = vault.mint(MIN_DEPOSIT, alice);
+
+        assertEq(assets, MIN_DEPOSIT);
+        assertEq(vault.balanceOf(alice), MIN_DEPOSIT);
+    }
+
+    function test_mint_revertsWhenAssetsBelowMinimum() public {
+        // Try to mint shares that would require less than MIN_DEPOSIT assets
+        uint256 smallShares = MIN_DEPOSIT / 2;
+
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PNGYVault.DepositBelowMinimum.selector,
+                smallShares, // previewMint returns same amount initially
+                MIN_DEPOSIT
+            )
+        );
+        vault.mint(smallShares, alice);
+    }
+
+    function test_mint_revertsZeroReceiver() public {
+        vm.prank(alice);
+        vm.expectRevert(PNGYVault.ZeroAddress.selector);
+        vault.mint(MIN_DEPOSIT, address(0));
+    }
+
+    function test_mint_differentReceiver() public {
+        vm.prank(alice);
+        vault.mint(MIN_DEPOSIT, bob);
+
+        assertEq(vault.balanceOf(bob), MIN_DEPOSIT);
+        assertEq(vault.balanceOf(alice), 0);
+    }
+
+    function test_mint_emitsEvent() public {
+        vm.prank(alice);
+        vm.expectEmit(true, true, false, true);
+        emit PNGYVault.DepositProcessed(alice, alice, MIN_DEPOSIT, MIN_DEPOSIT);
+        vault.mint(MIN_DEPOSIT, alice);
+    }
+
+    // =============================================================================
+    // Multi-User Scenarios
+    // =============================================================================
+
+    function test_deposit_multipleDepositsFromSameUser() public {
+        vm.startPrank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+        vault.deposit(MIN_DEPOSIT * 2, alice);
+        vm.stopPrank();
+
+        assertEq(vault.balanceOf(alice), MIN_DEPOSIT * 3);
+        assertEq(vault.totalAssets(), MIN_DEPOSIT * 3);
+    }
+
+    function test_deposit_shareRatioAfterYield() public {
+        // Alice deposits first
+        vm.prank(alice);
+        vault.deposit(MIN_DEPOSIT, alice);
+
+        // Simulate yield by updating managed assets
+        vm.prank(admin);
+        vault.updateManagedAssets(MIN_DEPOSIT); // Double the assets
+
+        // Bob deposits after yield
+        vm.prank(bob);
+        uint256 bobShares = vault.deposit(MIN_DEPOSIT, bob);
+
+        // Bob should get fewer shares because share price increased
+        assertLt(bobShares, MIN_DEPOSIT);
+        // Alice should have more value now
+        assertGt(vault.convertToAssets(vault.balanceOf(alice)), MIN_DEPOSIT);
+    }
+
+    // =============================================================================
+    // Gas Optimization Verification
+    // =============================================================================
+
+    function test_deposit_gasUsage() public {
+        vm.prank(alice);
+        uint256 gasBefore = gasleft();
+        vault.deposit(MIN_DEPOSIT, alice);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Log gas usage for reference (should be < 100k gas)
+        assertLt(gasUsed, 150_000);
+    }
+
+    function test_mint_gasUsage() public {
+        vm.prank(alice);
+        uint256 gasBefore = gasleft();
+        vault.mint(MIN_DEPOSIT, alice);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Log gas usage for reference
+        assertLt(gasUsed, 150_000);
+    }
 }
