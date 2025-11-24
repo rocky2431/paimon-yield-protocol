@@ -414,13 +414,13 @@
     },
     {
       "id": "41",
-      "title": "实现钱包连接功能 (RainbowKit)",
-      "description": "配置 RainbowKit + Wagmi。创建 components/WalletConnect.tsx。支持 MetaMask, Trust Wallet。显示连接的钱包地址和 USDT 余额。添加网络检查 (BSC 主网)。断开连接功能。编写组件测试。",
+      "title": "实现钱包连接功能 (Reown AppKit)",
+      "description": "配置 Reown AppKit + Wagmi。创建 components/WalletConnect.tsx。支持 MetaMask, Trust Wallet, WalletConnect。显示连接的钱包地址和 USDT 余额。添加网络检查 (BSC 主网/测试网)。断开连接功能。编写组件测试。",
       "complexity": 4,
       "priority": "P0",
       "dependencies": ["3"],
       "estimated_days": 1.5,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-11-连接钱包"
     },
