@@ -192,7 +192,7 @@
       "priority": "P1",
       "dependencies": ["11", "14"],
       "estimated_days": 2,
-      "status": "in_progress",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-43-配置-circuit-breaker"
     },
