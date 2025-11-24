@@ -12,6 +12,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IAssetRegistry} from "./interfaces/IAssetRegistry.sol";
 import {IOracleAdapter} from "./interfaces/IOracleAdapter.sol";
+import {ISwapHelper} from "./interfaces/ISwapHelper.sol";
 
 /// @title PNGYVault
 /// @author Paimon Yield Protocol
@@ -139,6 +140,15 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Timestamp when circuit breaker was last triggered
     uint256 public circuitBreakerTriggeredAt;
 
+    /// @notice SwapHelper for DEX integration
+    ISwapHelper public swapHelper;
+
+    /// @notice Default slippage for RWA swaps in basis points (100 = 1%)
+    uint256 public defaultSwapSlippage;
+
+    /// @notice Maximum allowed swap slippage (200 = 2%)
+    uint256 public constant MAX_SWAP_SLIPPAGE = 200;
+
     // =============================================================================
     // Events
     // =============================================================================
@@ -208,6 +218,18 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Emitted when circuit breaker threshold is updated
     event CircuitBreakerThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
 
+    /// @notice Emitted when swap helper is updated
+    event SwapHelperUpdated(address indexed oldSwapHelper, address indexed newSwapHelper);
+
+    /// @notice Emitted when default swap slippage is updated
+    event DefaultSwapSlippageUpdated(uint256 oldSlippage, uint256 newSlippage);
+
+    /// @notice Emitted when RWA tokens are purchased during deposit
+    event RWATokensPurchased(address indexed token, uint256 usdtSpent, uint256 tokensReceived);
+
+    /// @notice Emitted when RWA tokens are sold during withdrawal
+    event RWATokensSold(address indexed token, uint256 tokensSold, uint256 usdtReceived);
+
     // =============================================================================
     // Errors
     // =============================================================================
@@ -272,6 +294,12 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
     /// @notice Thrown when reference NAV is not set
     error ReferenceNavNotSet();
 
+    /// @notice Thrown when swap slippage is too high
+    error SwapSlippageTooHigh(uint256 slippage, uint256 maxAllowed);
+
+    /// @notice Thrown when RWA token swap fails
+    error RWASwapFailed(address token, uint256 amount);
+
     // =============================================================================
     // Constructor
     // =============================================================================
@@ -296,6 +324,7 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         // Initialize state
         lastNavUpdate = block.timestamp;
         circuitBreakerThreshold = DEFAULT_CIRCUIT_BREAKER_THRESHOLD;
+        defaultSwapSlippage = 100; // 1% default slippage
     }
 
     // =============================================================================
@@ -434,6 +463,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
         shares = super.deposit(assets, receiver);
 
+        // Purchase RWA tokens according to target allocations
+        _purchaseRWATokens(assets);
+
         emit DepositProcessed(msg.sender, receiver, assets, shares);
     }
 
@@ -454,6 +486,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         }
 
         assets = super.mint(shares, receiver);
+
+        // Purchase RWA tokens according to target allocations
+        _purchaseRWATokens(assets);
 
         emit DepositProcessed(msg.sender, receiver, assets, shares);
     }
@@ -485,6 +520,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
                 revert CircuitBreakerLimitExceeded(assets, CIRCUIT_BREAKER_LIMIT);
             }
         }
+
+        // Sell RWA tokens to obtain USDT if needed
+        _sellRWATokens(assets);
 
         shares = super.withdraw(assets, receiver, owner);
 
@@ -520,6 +558,9 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
                 revert CircuitBreakerLimitExceeded(previewedAssets, CIRCUIT_BREAKER_LIMIT);
             }
         }
+
+        // Sell RWA tokens to obtain USDT if needed
+        _sellRWATokens(previewedAssets);
 
         assets = super.redeem(shares, receiver, owner);
 
@@ -682,6 +723,28 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
         address oldOracle = address(oracleAdapter);
         oracleAdapter = IOracleAdapter(oracle_);
         emit OracleAdapterUpdated(oldOracle, oracle_);
+    }
+
+    /// @notice Set the swap helper contract for DEX integration
+    /// @dev Only callable by admin role
+    /// @param swapHelper_ The new swap helper address (can be zero to disable)
+    function setSwapHelper(address swapHelper_) external onlyRole(ADMIN_ROLE) {
+        address oldSwapHelper = address(swapHelper);
+        swapHelper = ISwapHelper(swapHelper_);
+        emit SwapHelperUpdated(oldSwapHelper, swapHelper_);
+    }
+
+    /// @notice Set the default swap slippage for RWA purchases/sales
+    /// @dev Only callable by admin role
+    /// @param slippage_ New default slippage in basis points (max 200 = 2%)
+    function setDefaultSwapSlippage(uint256 slippage_) external onlyRole(ADMIN_ROLE) {
+        if (slippage_ > MAX_SWAP_SLIPPAGE) {
+            revert SwapSlippageTooHigh(slippage_, MAX_SWAP_SLIPPAGE);
+        }
+
+        uint256 oldSlippage = defaultSwapSlippage;
+        defaultSwapSlippage = slippage_;
+        emit DefaultSwapSlippageUpdated(oldSlippage, slippage_);
     }
 
     /// @notice Add an RWA asset to the vault holdings
@@ -860,6 +923,139 @@ contract PNGYVault is ERC4626, AccessControl, Pausable, ReentrancyGuard {
 
             emit CircuitBreakerTriggered(currentNav, referenceNav, dropBasisPoints);
         }
+    }
+
+    // =============================================================================
+    // Internal Swap Functions
+    // =============================================================================
+
+    /// @notice Purchase RWA tokens according to target allocations
+    /// @dev Called internally after deposit. Uses SwapHelper for DEX swaps.
+    /// @param assets Amount of USDT available for purchasing RWA tokens
+    function _purchaseRWATokens(uint256 assets) internal {
+        // Skip if no swap helper configured
+        if (address(swapHelper) == address(0)) return;
+
+        // Skip if no RWA holdings
+        uint256 holdingCount = _rwaHoldings.length;
+        if (holdingCount == 0) return;
+
+        // Calculate total target allocation
+        uint256 totalAllocation;
+        for (uint256 i = 0; i < holdingCount;) {
+            if (_rwaHoldings[i].isActive) {
+                totalAllocation += _rwaHoldings[i].targetAllocation;
+            }
+            unchecked { ++i; }
+        }
+
+        // Skip if no allocation
+        if (totalAllocation == 0) return;
+
+        address underlyingAsset = asset();
+
+        // Approve SwapHelper to spend USDT
+        IERC20(underlyingAsset).safeIncreaseAllowance(address(swapHelper), assets);
+
+        // Purchase each RWA token according to allocation
+        for (uint256 i = 0; i < holdingCount;) {
+            RWAHolding memory holding = _rwaHoldings[i];
+
+            if (holding.isActive && holding.targetAllocation > 0) {
+                // Calculate amount to spend on this token
+                uint256 amountToSpend = (assets * holding.targetAllocation) / totalAllocation;
+
+                if (amountToSpend > 0) {
+                    // Execute swap via SwapHelper
+                    try swapHelper.buyRWAAsset(
+                        underlyingAsset,
+                        holding.tokenAddress,
+                        amountToSpend,
+                        defaultSwapSlippage
+                    ) returns (uint256 tokensReceived) {
+                        emit RWATokensPurchased(holding.tokenAddress, amountToSpend, tokensReceived);
+                    } catch {
+                        // Revert the entire transaction if swap fails
+                        revert RWASwapFailed(holding.tokenAddress, amountToSpend);
+                    }
+                }
+            }
+
+            unchecked { ++i; }
+        }
+
+        // Invalidate RWA cache
+        _cachedRwaValue.timestamp = 0;
+    }
+
+    /// @notice Sell RWA tokens to obtain USDT for withdrawal
+    /// @dev Called internally before withdrawal. Sells proportionally from each holding.
+    /// @param assetsNeeded Amount of USDT needed for withdrawal
+    function _sellRWATokens(uint256 assetsNeeded) internal {
+        // Skip if no swap helper configured
+        if (address(swapHelper) == address(0)) return;
+
+        // Check if we have enough idle USDT already
+        uint256 idleBalance = IERC20(asset()).balanceOf(address(this));
+        if (idleBalance >= assetsNeeded) return;
+
+        uint256 shortfall = assetsNeeded - idleBalance;
+
+        // Skip if no RWA holdings
+        uint256 holdingCount = _rwaHoldings.length;
+        if (holdingCount == 0) return;
+
+        // Calculate total RWA value
+        uint256 totalRwaValue = _calculateRWAValue();
+        if (totalRwaValue == 0) return;
+
+        address underlyingAsset = asset();
+
+        // Sell proportionally from each holding
+        for (uint256 i = 0; i < holdingCount;) {
+            RWAHolding memory holding = _rwaHoldings[i];
+
+            if (holding.isActive) {
+                uint256 tokenBalance = IERC20(holding.tokenAddress).balanceOf(address(this));
+
+                if (tokenBalance > 0) {
+                    // Get token value
+                    uint256 price = oracleAdapter.getPrice(holding.tokenAddress);
+                    uint256 tokenValue = (tokenBalance * price) / 1e18;
+
+                    // Calculate how much to sell (proportional to shortfall)
+                    uint256 sellValue = (shortfall * tokenValue) / totalRwaValue;
+                    uint256 tokensToSell = (sellValue * 1e18) / price;
+
+                    // Don't sell more than we have
+                    if (tokensToSell > tokenBalance) {
+                        tokensToSell = tokenBalance;
+                    }
+
+                    if (tokensToSell > 0) {
+                        // Approve SwapHelper
+                        IERC20(holding.tokenAddress).safeIncreaseAllowance(address(swapHelper), tokensToSell);
+
+                        // Execute swap
+                        try swapHelper.sellRWAAsset(
+                            holding.tokenAddress,
+                            underlyingAsset,
+                            tokensToSell,
+                            defaultSwapSlippage
+                        ) returns (uint256 usdtReceived) {
+                            emit RWATokensSold(holding.tokenAddress, tokensToSell, usdtReceived);
+                        } catch {
+                            revert RWASwapFailed(holding.tokenAddress, tokensToSell);
+                        }
+                    }
+                }
+            }
+
+            unchecked { ++i; }
+        }
+
+        // Invalidate RWA cache
+        _cachedRwaValue.timestamp = 0;
     }
 
     // =============================================================================
