@@ -160,3 +160,61 @@ enum OracleSource {
   CHAINLINK     // Chainlink fallback
   MANUAL        // Manual override (emergency)
 }
+
+// =============================================================================
+// Notification Preferences
+// =============================================================================
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  userAddress     String   @unique @db.VarChar(42)
+  email           String?  @db.VarChar(255)
+  emailVerified   Boolean  @default(false)
+  withdrawalAlert Boolean  @default(true)
+  rebalanceAlert  Boolean  @default(true)
+  emergencyAlert  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userAddress])
+  @@index([email])
+}
+
+// =============================================================================
+// Notification Log
+// =============================================================================
+
+model NotificationLog {
+  id              String           @id @default(cuid())
+  userAddress     String           @db.VarChar(42)
+  type            NotificationType
+  channel         NotificationChannel
+  recipient       String           @db.VarChar(255) // email address
+  subject         String?          @db.VarChar(255)
+  status          NotificationStatus
+  errorMessage    String?
+  sentAt          DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([userAddress])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  WITHDRAWAL_COMPLETE
+  REBALANCE_EXECUTED
+  EMERGENCY_PAUSE
+  CIRCUIT_BREAKER
+}
+
+enum NotificationChannel {
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}

@@ -29,6 +29,11 @@ const envSchema = z.object({
   EVENT_LISTENER_ENABLED: z.coerce.boolean().default(false),
   EVENT_LISTENER_START_BLOCK: z.coerce.bigint().optional(),
   EVENT_LISTENER_CONFIRMATIONS: z.coerce.number().default(12), // BSC ~12 blocks for finality
+
+  // Email (Resend)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Paimon Yield <noreply@paimon.finance>'),
+  EMAIL_ENABLED: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof envSchema>;
