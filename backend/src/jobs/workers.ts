@@ -1,5 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { getRedisOptions } from '../config/redis.js';
+import { sendNotification, broadcastNotification } from '../services/emailService.js';
+import type { NotificationType } from '@prisma/client';
 import type {
   NetValueSyncJobData,
   TransactionSyncJobData,
@@ -126,31 +128,62 @@ export const rebalanceWorker = new Worker<RebalanceJobData>(
 export const notificationWorker = new Worker<NotificationJobData>(
   'notifications',
   async (job: Job<NotificationJobData>) => {
-    const { type, userAddress } = job.data;
-    console.warn(`[Notification] Sending ${type} notification${userAddress ? ` to ${userAddress}` : ''}`);
+    const { type, userAddress, data, priority } = job.data;
+    const attemptNumber = job.attemptsMade + 1;
+
+    console.log(
+      `[Notification] Processing job ${job.id} (attempt ${attemptNumber}/${job.opts.attempts || 3})`,
+      { type, userAddress: userAddress || 'broadcast', priority }
+    );
 
     try {
-      // TODO: Implement notification delivery
-      // 1. For user notifications: webhook, email, or push
-      // 2. For system alerts: Discord/Telegram bot
-      // 3. Log to database
+      await job.updateProgress(10);
+
+      let result;
+
+      if (userAddress) {
+        // Send to specific user
+        console.log(`[Notification] Sending ${type} notification to user ${userAddress}`);
+        result = await sendNotification({
+          userAddress,
+          type: type as NotificationType,
+          data,
+        });
+      } else {
+        // Broadcast to all subscribed users
+        console.log(`[Notification] Broadcasting ${type} notification to all subscribers`);
+        result = await broadcastNotification(type as NotificationType, data);
+      }
 
       await job.updateProgress(100);
 
-      return {
+      const response = {
         success: true,
         type,
-        recipient: userAddress || 'system',
+        recipient: userAddress || 'broadcast',
         timestamp: new Date().toISOString(),
+        ...(userAddress
+          ? { messageId: result.messageId, error: result.error }
+          : { sent: (result as { sent: number; failed: number }).sent, failed: (result as { sent: number; failed: number }).failed }),
       };
+
+      console.log(`[Notification] Job ${job.id} completed:`, response);
+      return response;
     } catch (error) {
-      console.error(`[Notification] Job ${job.id} failed:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[Notification] Job ${job.id} failed (attempt ${attemptNumber}):`, errorMessage);
+
+      // Re-throw to trigger retry
       throw error;
     }
   },
   {
     connection,
     concurrency: 10, // Can send many notifications in parallel
+    limiter: {
+      max: 50, // Max 50 jobs per time window
+      duration: 60000, // 1 minute window (rate limit protection)
+    },
   }
 );
 

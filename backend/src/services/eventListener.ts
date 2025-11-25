@@ -3,6 +3,7 @@ import {
   http,
   webSocket,
   parseAbiItem,
+  formatUnits,
   type Log,
   type PublicClient,
   type WatchContractEventReturnType,
@@ -10,6 +11,7 @@ import {
 import { bsc, bscTestnet } from 'viem/chains';
 import { prisma } from './database';
 import { env } from '../config/env';
+import { addUserNotificationJob, addBroadcastNotificationJob } from '../jobs/queues.js';
 
 // =============================================================================
 // Types
@@ -456,6 +458,24 @@ export class EventListener {
       await this.updateUserPosition(owner, shares, assets, false);
 
       console.log(`[EventListener] Processed withdraw: ${log.transactionHash} (${assets} assets, ${shares} shares)`);
+
+      // Queue notification for withdrawal completion
+      try {
+        await addUserNotificationJob(
+          owner.toLowerCase(),
+          'WITHDRAWAL_COMPLETE',
+          {
+            amount: formatUnits(assets, 18), // Assuming 18 decimals for USDT display
+            shares: formatUnits(shares, 18),
+            txHash: log.transactionHash,
+          },
+          'normal'
+        );
+        console.log(`[EventListener] Queued withdrawal notification for ${owner}`);
+      } catch (notifyError) {
+        console.error(`[EventListener] Failed to queue withdrawal notification:`, notifyError);
+        // Don't fail the event processing if notification fails
+      }
     } catch (error) {
       console.error(`[EventListener] Error processing withdraw ${eventKey}:`, error);
     }
@@ -524,8 +544,46 @@ export class EventListener {
       }
 
       console.log(`[EventListener] Processed rebalance: ${log.transactionHash}`);
+
+      // Queue broadcast notification for rebalance execution
+      try {
+        // Get asset symbols for better notification content
+        const fromAssetSymbol = sellAssets.length > 0 ? await this.getAssetSymbol(sellAssets[0]) : 'Unknown';
+        const toAssetSymbol = buyAssets.length > 0 ? await this.getAssetSymbol(buyAssets[0]) : 'Unknown';
+        const totalSellAmount = sellAmounts.reduce((sum: bigint, amt: bigint) => sum + amt, 0n);
+
+        await addBroadcastNotificationJob(
+          'REBALANCE_EXECUTED',
+          {
+            fromAsset: fromAssetSymbol,
+            toAsset: toAssetSymbol,
+            amount: formatUnits(totalSellAmount, 18),
+            txHash: log.transactionHash,
+          },
+          'normal'
+        );
+        console.log(`[EventListener] Queued rebalance broadcast notification`);
+      } catch (notifyError) {
+        console.error(`[EventListener] Failed to queue rebalance notification:`, notifyError);
+        // Don't fail the event processing if notification fails
+      }
     } catch (error) {
       console.error(`[EventListener] Error processing rebalance ${log.transactionHash}:`, error);
+    }
+  }
+
+  /**
+   * Get asset symbol from database or return address as fallback
+   */
+  private async getAssetSymbol(tokenAddress: string): Promise<string> {
+    try {
+      const asset = await prisma.assetAllocation.findUnique({
+        where: { tokenAddress: tokenAddress.toLowerCase() },
+        select: { tokenSymbol: true },
+      });
+      return asset?.tokenSymbol || tokenAddress.slice(0, 10);
+    } catch {
+      return tokenAddress.slice(0, 10);
     }
   }
 
