@@ -10,6 +10,7 @@ import { transactionRoutes } from './routes/transactions.js';
 import { netvalueRoutes } from './routes/netvalue.js';
 import { assetsRoutes } from './routes/assets.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { reportRoutes } from './routes/reports.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -64,6 +65,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         { name: 'netvalue', description: 'Historical net value data' },
         { name: 'assets', description: 'RWA asset allocation data' },
         { name: 'notifications', description: 'Notification preferences and history' },
+        { name: 'reports', description: 'B2B custom report export' },
       ],
     },
   });
@@ -83,6 +85,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(netvalueRoutes, { prefix: '/api' });
   await server.register(assetsRoutes, { prefix: '/api' });
   await server.register(notificationRoutes, { prefix: '/api' });
+  await server.register(reportRoutes, { prefix: '/api' });
 
   return server;
 }
