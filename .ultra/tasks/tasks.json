@@ -624,7 +624,7 @@
       "priority": "P2",
       "dependencies": ["4", "5"],
       "estimated_days": 2,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-51-b2b-定制化报表"
     },
