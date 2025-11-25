@@ -8,6 +8,7 @@ import { healthRoutes } from './routes/health.js';
 import { vaultRoutes } from './routes/vault.js';
 import { transactionRoutes } from './routes/transactions.js';
 import { netvalueRoutes } from './routes/netvalue.js';
+import { assetsRoutes } from './routes/assets.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -60,6 +61,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         { name: 'vault', description: 'Vault operations' },
         { name: 'transactions', description: 'Transaction history' },
         { name: 'netvalue', description: 'Historical net value data' },
+        { name: 'assets', description: 'RWA asset allocation data' },
       ],
     },
   });
@@ -77,6 +79,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(vaultRoutes, { prefix: '/api/vault' });
   await server.register(transactionRoutes, { prefix: '/api' });
   await server.register(netvalueRoutes, { prefix: '/api' });
+  await server.register(assetsRoutes, { prefix: '/api' });
 
   return server;
 }
