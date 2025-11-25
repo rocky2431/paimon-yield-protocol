@@ -1,0 +1,1308 @@
+Warning: optimizer settings and `viaIR` have been disabled for accurate coverage reports.
+If you encounter "stack too deep" errors, consider using `--ir-minimum` which enables `viaIR` with minimum optimization resolving most of the errors
+Compiling 85 files with Solc 0.8.24
+Solc 0.8.24 finished in 1.60s
+Compiler run successful with warnings:
+Warning (2072): Unused local variable.
+   --> test/PNGYVaultCoverage.t.sol:211:9:
+    |
+211 |         uint256 vaultUsdtBefore = usdt.balanceOf(address(vault));
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2072): Unused local variable.
+   --> test/PNGYVaultRebalance.t.sol:501:12:
+    |
+501 |         (, uint256 timestampBefore, bool isFreshBefore) = vault.getCachedRWAValue();
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2072): Unused local variable.
+   --> test/integration/BSCTestnetSimulation.t.sol:212:9:
+    |
+212 |         uint256 usdtBefore = usdt.balanceOf(user1);
+    |         ^^^^^^^^^^^^^^^^^^
+
+Warning (2072): Unused local variable.
+   --> test/integration/BSCTestnetSimulation.t.sol:311:9:
+    |
+311 |         uint256 shares = vault.deposit(largeDeposit, user1);
+    |         ^^^^^^^^^^^^^^
+
+Warning (5667): Unused try/catch parameter. Remove or comment out the variable name to silence this warning.
+  --> test/invariant/Handler.sol:89:51:
+   |
+89 |         try vault.deposit(amount, actor) returns (uint256 shares) {
+   |                                                   ^^^^^^^^^^^^^^
+
+Warning (5667): Unused try/catch parameter. Remove or comment out the variable name to silence this warning.
+   --> test/invariant/Handler.sol:130:59:
+    |
+130 |         try vault.withdraw(amount, actor, actor) returns (uint256 shares) {
+    |                                                           ^^^^^^^^^^^^^^
+
+Warning (2072): Unused local variable.
+   --> test/invariant/PNGYVault.invariant.t.sol:111:9:
+    |
+111 |         uint256 withdrawCount = handler.ghost_withdrawCount();
+    |         ^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> src/RebalanceStrategy.sol:217:5:
+    |
+217 |     function generateRebalanceTx(
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+   --> test/AssetRegistry.t.sol:526:5:
+    |
+526 |     function testFuzz_registerAsset_validAddresses(address tokenAddr) public {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+    --> test/PNGYVault.t.sol:1300:5:
+     |
+1300 |     function test_getRWAValue_returnsZeroWithoutOracle() public {
+     |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to view
+   --> test/PNGYVaultCoverage.t.sol:722:5:
+    |
+722 |     function test_Withdraw_ExceedsInstantLimitWithCircuitBreaker() public {
+    |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Analysing contracts...
+Running tests...
+
+Ran 19 tests for test/GnosisSafeGovernance.t.sol:GnosisSafeGovernanceTest
+[PASS] test_CannotRevokeLastDefaultAdmin() (gas: 81080)
+[PASS] test_CriticalOperationsRequireCorrectRole() (gas: 47778)
+[PASS] test_DeployerCannotPauseAfterRoleRevoked() (gas: 51284)
+[PASS] test_DeployerHasAllRoles() (gas: 20202)
+[PASS] test_FullRoleTransferToGnosisSafe() (gas: 130483)
+[PASS] test_GasReport_GovernanceOperations() (gas: 89380)
+Logs:
+  
+========================================
+  GAS REPORT - Governance Operations
+  ========================================
+
+  Operation              | Gas Used
+  -----------------------+----------
+  Grant Role             | 37717
+  Revoke Role            | 5249
+  Pause Vault            | 24985
+  Unpause Vault          | 3105
+  
+========================================
+
+
+[PASS] test_GetRoleAdmin() (gas: 12547)
+[PASS] test_GnosisSafeCanEnableEmergencyWithdraw() (gas: 70249)
+[PASS] test_GnosisSafeCanPauseVault() (gas: 70115)
+[PASS] test_GnosisSafeCanSetAssetRegistry() (gas: 71570)
+[PASS] test_GnosisSafeCanSetCircuitBreakerThreshold() (gas: 53633)
+[PASS] test_GnosisSafeCanUnpauseVault() (gas: 56205)
+[PASS] test_OnlyDefaultAdminCanGrantRoles() (gas: 86830)
+[PASS] test_RenounceRole() (gas: 79800)
+[PASS] test_SimulateMultiSigApproval() (gas: 81040)
+Logs:
+  
+=== Multi-Sig Approval Simulation ===
+
+  Step 1: Signer1 proposes to pause the vault
+  Step 2: Signer2 confirms the transaction
+  Step 3: Signer3 confirms the transaction
+  Step 4: Threshold reached (3/5), executing transaction...
+  Step 5: Transaction executed successfully
+     Vault paused: true
+
+[PASS] test_TransferAdminRoleToGnosisSafe() (gas: 50404)
+[PASS] test_TransferDefaultAdminRoleToGnosisSafe() (gas: 45903)
+[PASS] test_TransferRebalancerRoleToGnosisSafe() (gas: 45938)
+[PASS] test_UnauthorizedCannotPauseAfterTransfer() (gas: 55306)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 5.67ms (3.96ms CPU time)
+
+Ran 8 tests for test/Counter.t.sol:CounterTest
+[PASS] testFuzz_Increment(uint256) (runs: 256, μ: 34405, ~: 34401)
+[PASS] testFuzz_SetNumber(uint256) (runs: 256, μ: 28592, ~: 29214)
+[PASS] test_Increment() (gas: 30029)
+[PASS] test_Increment_FromZero() (gas: 29816)
+[PASS] test_InitialNumber() (gas: 7896)
+[PASS] test_SetNumber() (gas: 29059)
+[PASS] test_SetNumber_MaxUint() (gas: 28951)
+[PASS] test_SetNumber_Zero() (gas: 9203)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 11.68ms (11.31ms CPU time)
+
+Ran 17 tests for test/integration/PNGYVaultSwapIntegration.t.sol:PNGYVaultSwapIntegrationTest
+[PASS] test_Deposit_AllocatesAccordingToTargets() (gas: 359674)
+[PASS] test_Deposit_GasUsage() (gas: 356188)
+Logs:
+  Deposit with RWA purchase gas used: 446332
+
+[PASS] test_Deposit_HandlesSlippageError() (gas: 299752)
+[PASS] test_Deposit_PurchasesRWATokens() (gas: 361108)
+[PASS] test_Deposit_WithZeroAllocation() (gas: 275667)
+[PASS] test_Deposit_WorksWithNoRWAAssets() (gas: 150980)
+[PASS] test_Deposit_WorksWithoutSwapHelper() (gas: 158823)
+[PASS] test_Redeem_SellsRWATokens() (gas: 669012)
+[PASS] test_SetDefaultSwapSlippage_RevertIf_TooHigh() (gas: 14401)
+[PASS] test_SetDefaultSwapSlippage_Success() (gas: 21536)
+[PASS] test_SetSwapHelper_EmitsEvent() (gas: 27258)
+[PASS] test_SetSwapHelper_RevertIf_NotAdmin() (gas: 16728)
+[PASS] test_SetSwapHelper_Success() (gas: 24522)
+[PASS] test_Withdraw_InsufficientLiquidity() (gas: 508235)
+[PASS] test_Withdraw_SellsProportionalRWA() (gas: 658996)
+[PASS] test_Withdraw_SellsRWATokens() (gas: 656095)
+[PASS] test_Withdraw_WorksWithOnlyUSDT() (gas: 209675)
+Suite result: ok. 17 passed; 0 failed; 0 skipped; finished in 15.03ms (13.16ms CPU time)
+
+Ran 9 tests for test/integration/BSCTestnetSimulation.t.sol:BSCTestnetSimulationTest
+[PASS] test_FullFlow_Deposit_Withdraw() (gas: 756168)
+Logs:
+  
+=== Full Flow Test: Deposit -> Withdraw ===
+
+  1. User deposits $10,000 USDT
+     Shares received: 10000
+     Gas used: 436656
+     Vault RWA Bond balance: 6000
+     Vault RWA Stock balance: 2000
+  
+2. Checking NAV and share price
+     Total assets: 10000
+     Share price: 1
+  
+3. User withdraws 50% of shares
+     Assets received: 5000
+     Gas used: 377557
+     User USDT balance change: 5000
+  
+=== Gas Summary ===
+     Deposit gas: 436656
+     Withdraw gas: 377557
+
+[PASS] test_GasReport() (gas: 1174961)
+Logs:
+  
+========================================
+  GAS REPORT - BSC Testnet Simulation
+  ========================================
+
+  Operation          | Gas Used
+  -------------------+----------
+  Deposit ($10K)     | 441282
+  Withdraw (50%)     | 388054
+  Rebalance          | 283647
+  
+  Estimated costs at 5 gwei:
+    Deposit:  2 mBNB
+    Withdraw: 1 mBNB
+    Rebalance: 1 mBNB
+  
+========================================
+
+
+[PASS] test_MaxWithdrawal() (gas: 380864)
+Logs:
+  
+=== Max Withdrawal Test ($100K limit) ===
+
+     Max withdrawal limit: 100000
+     Over-limit withdrawal correctly rejected
+
+[PASS] test_MinDeposit() (gas: 357916)
+Logs:
+  
+=== Min Deposit Test ($500) ===
+
+     Min deposit: 500
+     Shares received: 500
+
+[PASS] test_MultipleUsers_Concurrent() (gas: 613373)
+Logs:
+  
+=== Multiple Users Concurrent Test ===
+
+     User1 shares: 10000
+     User2 shares: 20000
+     Total supply: 30000
+
+[PASS] test_Rebalance_Flow() (gas: 629277)
+Logs:
+  
+=== Rebalance Flow Test ===
+
+  Initial state after deposit:
+     RWA Bond balance: 30000
+     RWA Stock balance: 10000
+  
+Executing rebalance...
+  
+Rebalance results:
+     USDT received from sell: 5000
+     RWA Stock received: 2500
+     Gas used: 291757
+  
+Final state:
+     RWA Bond balance: 25000
+     RWA Stock balance: 12500
+
+[PASS] test_Slippage_100K_Deposit() (gas: 402471)
+Logs:
+  
+=== Slippage Test: 100K ===
+
+     Deposit amount: 100000
+     Shares received: 100000
+     Gas used: 430319
+     Effective slippage (bps): 0
+
+[PASS] test_Slippage_10K_Deposit() (gas: 402435)
+Logs:
+  
+=== Slippage Test: 10K ===
+
+     Deposit amount: 10000
+     Shares received: 10000
+     Gas used: 430319
+     Effective slippage (bps): 0
+
+[PASS] test_Slippage_1K_Deposit() (gas: 402418)
+Logs:
+  
+=== Slippage Test: 1K ===
+
+     Deposit amount: 1000
+     Shares received: 1000
+     Gas used: 430319
+     Effective slippage (bps): 0
+
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 16.58ms (14.74ms CPU time)
+
+Ran 15 tests for test/RWARemoval.t.sol:RWARemovalTest
+[PASS] test_FullRemovalFlow() (gas: 585713)
+[PASS] test_MarkAssetForRemoval_DeactivatesAsset() (gas: 52908)
+[PASS] test_MarkAssetForRemoval_EmitsEvent() (gas: 50309)
+[PASS] test_MarkAssetForRemoval_RevertIf_NotAdmin() (gas: 16343)
+[PASS] test_MarkAssetForRemoval_RevertIf_NotRegistered() (gas: 19630)
+[PASS] test_MarkAssetForRemoval_Success() (gas: 52499)
+[PASS] test_RemoveRWAAssetWithLiquidation_EmitsEvents() (gas: 508355)
+[PASS] test_RemoveRWAAssetWithLiquidation_NoSwapHelper() (gas: 395854)
+[PASS] test_RemoveRWAAssetWithLiquidation_RevertIf_NotAdmin() (gas: 16629)
+[PASS] test_RemoveRWAAssetWithLiquidation_RevertIf_NotInHoldings() (gas: 24894)
+[PASS] test_RemoveRWAAssetWithLiquidation_Success() (gas: 509486)
+[PASS] test_RemoveRWAAssetWithLiquidation_UpdatesHoldingCount() (gas: 57222)
+[PASS] test_RemoveRWAAssetWithLiquidation_ZeroBalance() (gas: 56944)
+[PASS] test_UnmarkAssetForRemoval_EmitsEvent() (gas: 39189)
+[PASS] test_UnmarkAssetForRemoval_Success() (gas: 40683)
+Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 16.56ms (14.09ms CPU time)
+
+Ran 44 tests for test/OracleAdapter.t.sol:OracleAdapterTest
+[PASS] testFuzz_ConfigureOracle_AnyValidPrice(uint256) (runs: 256, μ: 157303, ~: 157303)
+[PASS] testFuzz_StalenessThreshold_ValidRange(uint256) (runs: 256, μ: 22290, ~: 22290)
+[PASS] test_ConfigureOracle_EmitsEvent() (gas: 140962)
+[PASS] test_ConfigureOracle_OnlyBackup() (gas: 121998)
+[PASS] test_ConfigureOracle_OnlyPrimary() (gas: 122019)
+[PASS] test_ConfigureOracle_RevertIf_BothOraclesZero() (gas: 17514)
+[PASS] test_ConfigureOracle_RevertIf_NotAdmin() (gas: 21835)
+[PASS] test_ConfigureOracle_RevertIf_ZeroAsset() (gas: 19614)
+[PASS] test_ConfigureOracle_Success() (gas: 140551)
+[PASS] test_ConfigureOracle_UpdatesExisting() (gas: 171903)
+[PASS] test_ConfigureOracle_WithCustomThreshold() (gas: 159131)
+[PASS] test_Constructor_RevertIf_ZeroAdmin() (gas: 38309)
+[PASS] test_Constructor_SetsAdmin() (gas: 17697)
+[PASS] test_Constructor_SetsDefaultStalenessThreshold() (gas: 8015)
+[PASS] test_GetConfiguredAssets_ReturnsAll() (gas: 240920)
+[PASS] test_GetOracleConfig_ReturnsCorrectData() (gas: 161961)
+[PASS] test_GetOracleConfig_RevertIf_NotConfigured() (gas: 16700)
+[PASS] test_GetPriceWithSource_ReturnsBackup_OnFailover() (gas: 166592)
+[PASS] test_GetPriceWithSource_ReturnsPrimary() (gas: 152467)
+[PASS] test_GetPriceWithTimestamp_ReturnsCorrectTimestamp() (gas: 160442)
+[PASS] test_GetPriceWithTimestamp_Success() (gas: 151971)
+[PASS] test_GetPrice_FailoverToBackup_WhenPrimaryStale() (gas: 170996)
+[PASS] test_GetPrice_FailoverToBackup_WhenPrimaryZero() (gas: 165598)
+[PASS] test_GetPrice_ReturnsStalePrice_WhenBothStale() (gas: 174318)
+[PASS] test_GetPrice_RevertIf_AllOraclesFail() (gas: 380593)
+[PASS] test_GetPrice_RevertIf_NotConfigured() (gas: 14643)
+[PASS] test_GetPrice_UsesPrimaryOracle() (gas: 151670)
+[PASS] test_IsPriceStale_ReturnsFalse_WhenFresh() (gas: 152486)
+[PASS] test_IsPriceStale_ReturnsTrue_WhenStale() (gas: 172136)
+[PASS] test_IsPriceStale_UsesCustomThreshold() (gas: 189768)
+[PASS] test_RemoveOracle_EmitsEvent() (gas: 112579)
+[PASS] test_RemoveOracle_RevertIf_NotAdmin() (gas: 144474)
+[PASS] test_RemoveOracle_RevertIf_NotConfigured() (gas: 19680)
+[PASS] test_RemoveOracle_Success() (gas: 115216)
+[PASS] test_SetBackupOracle_RevertIf_NotConfigured() (gas: 22121)
+[PASS] test_SetBackupOracle_Success() (gas: 549832)
+[PASS] test_SetGlobalStalenessThreshold_EmitsEvent() (gas: 22597)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_NotAdmin() (gas: 14397)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_TooHigh() (gas: 15255)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_Zero() (gas: 15230)
+[PASS] test_SetGlobalStalenessThreshold_Success() (gas: 21513)
+[PASS] test_SetPrimaryOracle_RevertIf_BothWouldBeZero() (gas: 118872)
+[PASS] test_SetPrimaryOracle_RevertIf_NotConfigured() (gas: 22097)
+[PASS] test_SetPrimaryOracle_Success() (gas: 549785)
+Suite result: ok. 44 passed; 0 failed; 0 skipped; finished in 25.50ms (32.19ms CPU time)
+
+Ran 42 tests for test/APROOracle.t.sol:APROOracleTest
+[PASS] testFuzz_ConfigureAsset_AnyValidPrice(int224) (runs: 256, μ: 130849, ~: 130849)
+[PASS] testFuzz_StalenessThreshold_ValidRange(uint256) (runs: 256, μ: 22136, ~: 22136)
+[PASS] test_ConfigureAssetWithDapiName_RevertIf_ZeroName() (gas: 17104)
+[PASS] test_ConfigureAssetWithDapiName_Success() (gas: 121562)
+[PASS] test_ConfigureAsset_EmitsEvent() (gas: 112735)
+[PASS] test_ConfigureAsset_RevertIf_NotAdmin() (gas: 17090)
+[PASS] test_ConfigureAsset_RevertIf_ZeroAsset() (gas: 14871)
+[PASS] test_ConfigureAsset_RevertIf_ZeroDataFeedId() (gas: 17041)
+[PASS] test_ConfigureAsset_Success() (gas: 113113)
+[PASS] test_ConfigureAsset_UpdatesExisting() (gas: 141658)
+[PASS] test_ConfigureAsset_WithCustomThreshold() (gas: 131647)
+[PASS] test_Constructor_RevertIf_ZeroAdmin() (gas: 40548)
+[PASS] test_Constructor_RevertIf_ZeroApi3Server() (gas: 40583)
+[PASS] test_Constructor_SetsAdmin() (gas: 17697)
+[PASS] test_Constructor_SetsApi3Server() (gas: 8210)
+[PASS] test_Constructor_SetsDefaultStalenessThreshold() (gas: 7927)
+[PASS] test_GetAssetConfig_ReturnsCorrectData() (gas: 133394)
+[PASS] test_GetAssetConfig_RevertIf_NotConfigured() (gas: 16384)
+[PASS] test_GetConfiguredAssets_ReturnsAll() (gas: 189938)
+[PASS] test_GetPriceWithSource_ReturnsPrimary() (gas: 124063)
+[PASS] test_GetPriceWithTimestamp_ReturnsCorrectTimestamp() (gas: 131002)
+[PASS] test_GetPriceWithTimestamp_Success() (gas: 123593)
+[PASS] test_GetPrice_ReturnsCorrectValue() (gas: 130124)
+[PASS] test_GetPrice_RevertIf_NegativePrice() (gas: 131794)
+[PASS] test_GetPrice_RevertIf_NotConfigured() (gas: 14663)
+[PASS] test_GetPrice_RevertIf_ZeroPrice() (gas: 126993)
+[PASS] test_GetPrice_Success() (gas: 123212)
+[PASS] test_IsPriceStale_ReturnsFalse_WhenFresh() (gas: 126046)
+[PASS] test_IsPriceStale_ReturnsTrue_WhenStale() (gas: 133381)
+[PASS] test_IsPriceStale_RevertIf_NotConfigured() (gas: 14621)
+[PASS] test_IsPriceStale_UsesCustomThreshold() (gas: 151173)
+[PASS] test_MultipleAssets_IndependentPrices() (gas: 214490)
+[PASS] test_PriceUpdate_ReflectsImmediately() (gas: 135013)
+[PASS] test_RemoveAsset_EmitsEvent() (gas: 90218)
+[PASS] test_RemoveAsset_RevertIf_NotAdmin() (gas: 116948)
+[PASS] test_RemoveAsset_RevertIf_NotConfigured() (gas: 19572)
+[PASS] test_RemoveAsset_Success() (gas: 92820)
+[PASS] test_SetGlobalStalenessThreshold_EmitsEvent() (gas: 22532)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_NotAdmin() (gas: 14243)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_TooHigh() (gas: 15210)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_Zero() (gas: 15186)
+[PASS] test_SetGlobalStalenessThreshold_Success() (gas: 21381)
+Suite result: ok. 42 passed; 0 failed; 0 skipped; finished in 29.98ms (34.49ms CPU time)
+
+Ran 14 tests for test/integration/AdvancedIntegration.t.sol:AdvancedIntegrationTest
+[PASS] test_CircuitBreaker_EmergencyBypass() (gas: 785272)
+Logs:
+  
+=== Emergency Bypass Test ===
+
+  Circuit breaker active: true
+  Emergency mode enabled: true
+  Large withdrawal succeeded in emergency mode
+
+[PASS] test_CircuitBreaker_FullFlow() (gas: 693794)
+Logs:
+  
+=== Circuit Breaker Full Flow Test ===
+
+  Step 1: Initial deposits
+     Initial NAV: 80000
+  
+Step 2: Configure circuit breaker
+  
+Step 3: Force activate circuit breaker
+     Circuit breaker activated: true
+  
+Step 5: Test withdrawal limits
+     Circuit breaker limit: 10000
+     Small withdrawal succeeded
+     Attempting withdrawal of: 15000 USDT
+     Instant limit: 10000 USDT
+     Large withdrawal blocked (as expected - exceeds instant limit)
+  
+Step 6: Reset circuit breaker
+     Circuit breaker reset
+  
+Step 7: Normal withdrawals resume
+     Instant withdrawal succeeded after circuit breaker reset
+  
+Step 8: Large withdrawal still needs T+1 queue
+     Large withdrawal queued, request ID: 0
+
+[PASS] test_Concurrent_DepositAndWithdraw() (gas: 317627)
+Logs:
+  
+=== Concurrent Deposit and Withdraw Test ===
+
+  Initial state:
+     Total supply: 50000
+     Total assets: 50000
+  
+Concurrent operations:
+     User2 deposited, shares: 30000
+     User1 withdrew, assets: 5000
+  
+Final state:
+     Total supply: 75000
+     Total assets: 75000
+     User1 shares: 45000
+     User2 shares: 30000
+
+[PASS] test_EmergencyWithdrawal_AllUsers() (gas: 413842)
+Logs:
+  
+=== Mass Emergency Withdrawal Test ===
+
+  Total assets before: 100000
+  Total assets after: 0
+
+[PASS] test_EmergencyWithdrawal_WhenPaused() (gas: 262684)
+Logs:
+  
+=== Emergency Withdrawal When Paused Test ===
+
+  Vault paused
+  Normal withdrawal blocked (as expected)
+  Emergency withdrawal enabled
+  Emergency withdrawal succeeded
+
+[PASS] test_GasOptimization_BatchOperations() (gas: 844663)
+Logs:
+  
+=== Gas Optimization Test ===
+
+  Deposit 1000 USDT - Gas: 431032
+  Deposit 10000 USDT - Gas: 285002
+  Deposit 100000 USDT - Gas: 274502
+
+[PASS] test_MultiRound_Rebalance() (gas: 434531)
+Logs:
+  
+=== Multi-Round Rebalance Test ===
+
+  Initial allocation: 60% Bond, 40% Stock
+  
+Round 1: Rebalance to 50/50
+     Asset allocation: 50
+     Asset allocation: 50
+  
+Round 2: Rebalance to 70/30
+     Asset allocation: 70
+     Asset allocation: 30
+  
+Round 3: Rebalance to 60/40
+     Asset allocation: 60
+     Asset allocation: 40
+
+[PASS] test_OracleFailover_PrimaryFails_FallbackUsed() (gas: 420910)
+Logs:
+  
+=== Oracle Failover Test ===
+
+  Initial NAV: 10000
+  NAV after primary failure: 4000
+  NAV after restore: 10000
+
+[PASS] test_OracleFailover_StalePrice_Handled() (gas: 402612)
+Logs:
+  
+=== Stale Price Handling Test ===
+
+
+[PASS] test_PriceDecrease_UserLoss() (gas: 416731)
+Logs:
+  
+=== Price Decrease User Loss Test ===
+
+  Initial assets value: 10000
+  Assets after price decrease: 9000
+  Loss: 1000
+
+[PASS] test_PriceIncrease_UserProfit() (gas: 416715)
+Logs:
+  
+=== Price Increase User Profit Test ===
+
+  Initial assets value: 10000
+  Assets after price increase: 11999
+  Profit: 1999
+
+[PASS] test_T1WithdrawalQueue_FullFlow() (gas: 408466)
+Logs:
+  
+=== T+1 Withdrawal Queue Test ===
+
+  Step 1: User deposits
+     Deposited: 100,000 USDT
+  
+Step 2: Request large withdrawal
+     Request ID: 0
+     Shares locked: 15000
+  
+Step 3: Verify shares locked
+     Total locked shares: 15000
+  
+Step 4: Attempt early claim (should fail)
+     Early claim correctly rejected
+  
+Step 5: Advance time past T+1 delay
+     Time advanced by: 24 hours
+  
+Step 6: Claim withdrawal
+     Assets received: 15000
+
+[PASS] test_T1WithdrawalQueue_MultipleRequests() (gas: 652412)
+Logs:
+  
+=== Multiple T+1 Requests Test ===
+
+  Request 1 ID: 0
+  Request 2 ID: 1
+  User1 received: 15000
+  User2 received: 15000
+
+[PASS] test_T1WithdrawalQueue_RequestInfo() (gas: 387242)
+Logs:
+  
+=== T+1 Request Info Test ===
+
+  Request ID: 0
+  Shares: 15000
+  Assets: 15000
+  Receiver: 0x29E3b139f4393aDda86303fcdAa35F60Bb7092bF
+  Request time: 1700000000
+  Claimed: false
+
+Suite result: ok. 14 passed; 0 failed; 0 skipped; finished in 32.56ms (22.49ms CPU time)
+
+Ran 40 tests for test/ChainlinkOracle.t.sol:ChainlinkOracleTest
+[PASS] testFuzz_ConfigureAsset_AnyValidPrice(int256) (runs: 256, μ: 140377, ~: 140377)
+[PASS] testFuzz_StalenessThreshold_ValidRange(uint256) (runs: 256, μ: 22158, ~: 22158)
+[PASS] test_ConfigureAsset_EmitsEvent() (gas: 122024)
+[PASS] test_ConfigureAsset_RevertIf_NotAdmin() (gas: 19345)
+[PASS] test_ConfigureAsset_RevertIf_ZeroAggregator() (gas: 17160)
+[PASS] test_ConfigureAsset_RevertIf_ZeroAsset() (gas: 17126)
+[PASS] test_ConfigureAsset_Success() (gas: 121770)
+[PASS] test_ConfigureAsset_UpdatesExisting() (gas: 159974)
+[PASS] test_ConfigureAsset_WithCustomThreshold() (gas: 140216)
+[PASS] test_Constructor_RevertIf_ZeroAdmin() (gas: 38323)
+[PASS] test_Constructor_SetsAdmin() (gas: 17785)
+[PASS] test_Constructor_SetsDefaultStalenessThreshold() (gas: 8013)
+[PASS] test_GetAssetConfig_ReturnsCorrectData() (gas: 142936)
+[PASS] test_GetConfiguredAssets_ReturnsAll() (gas: 207076)
+[PASS] test_GetPriceWithSource_ReturnsBackup() (gas: 132219)
+[PASS] test_GetPriceWithTimestamp_ReturnsCorrectTimestamp() (gas: 140347)
+[PASS] test_GetPriceWithTimestamp_Success() (gas: 131726)
+[PASS] test_GetPrice_ConvertsDecimals_18to18() (gas: 848871)
+[PASS] test_GetPrice_ConvertsDecimals_6to18() (gas: 849816)
+[PASS] test_GetPrice_ConvertsDecimals_8to18() (gas: 139533)
+[PASS] test_GetPrice_RevertIf_IncompleteRound() (gas: 137943)
+[PASS] test_GetPrice_RevertIf_NegativePrice() (gas: 140056)
+[PASS] test_GetPrice_RevertIf_NotConfigured() (gas: 14618)
+[PASS] test_GetPrice_RevertIf_ZeroPrice() (gas: 135321)
+[PASS] test_GetPrice_Success() (gas: 131343)
+[PASS] test_IsPriceStale_ReturnsFalse_WhenFresh() (gas: 134119)
+[PASS] test_IsPriceStale_ReturnsTrue_WhenStale() (gas: 142760)
+[PASS] test_IsPriceStale_UsesCustomThreshold() (gas: 160508)
+[PASS] test_MultipleAssets_IndependentPrices() (gas: 239890)
+[PASS] test_PriceUpdate_ReflectsImmediately() (gas: 146172)
+[PASS] test_RemoveAsset_EmitsEvent() (gas: 97471)
+[PASS] test_RemoveAsset_RevertIf_NotConfigured() (gas: 19616)
+[PASS] test_RemoveAsset_Success() (gas: 100179)
+[PASS] test_SetAggregator_RevertIf_NotConfigured() (gas: 22053)
+[PASS] test_SetAggregator_RevertIf_ZeroAddress() (gas: 121715)
+[PASS] test_SetAggregator_Success() (gas: 134678)
+[PASS] test_SetGlobalStalenessThreshold_EmitsEvent() (gas: 22576)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_TooHigh() (gas: 15254)
+[PASS] test_SetGlobalStalenessThreshold_RevertIf_Zero() (gas: 15186)
+[PASS] test_SetGlobalStalenessThreshold_Success() (gas: 21403)
+Suite result: ok. 40 passed; 0 failed; 0 skipped; finished in 33.24ms (40.70ms CPU time)
+
+Ran 36 tests for test/RebalanceStrategy.t.sol:RebalanceStrategyTest
+[PASS] testFuzz_ApySensitivity_ValidRange(uint256) (runs: 256, μ: 21000, ~: 22193)
+[PASS] testFuzz_RebalanceThreshold_ValidRange(uint256) (runs: 256, μ: 22142, ~: 22142)
+[PASS] test_CalculateOptimalAllocation_EqualAPY() (gas: 37450)
+[PASS] test_CalculateOptimalAllocation_HigherAPYGetsMore() (gas: 37274)
+[PASS] test_CalculateOptimalAllocation_RespectsMaxAllocation() (gas: 89542)
+[PASS] test_CalculateOptimalAllocation_RevertIf_Empty() (gas: 11680)
+[PASS] test_CalculateOptimalAllocation_ThreeAssets() (gas: 51600)
+[PASS] test_Constructor_RevertIf_InvalidSensitivity() (gas: 41708)
+[PASS] test_Constructor_RevertIf_ZeroAdmin() (gas: 38430)
+[PASS] test_Constructor_SetsAdmin() (gas: 17631)
+[PASS] test_Constructor_SetsDefaultThreshold() (gas: 9046)
+[PASS] test_Constructor_SetsSensitivity() (gas: 7969)
+[PASS] test_GenerateRebalanceTx_RevertIf_ArrayLengthMismatch() (gas: 20122)
+[PASS] test_GenerateRebalanceTx_RevertIf_InvalidTotalAllocation() (gas: 21438)
+[PASS] test_GenerateRebalanceTx_SimpleRebalance() (gas: 27206)
+[PASS] test_GenerateRebalanceTx_SkipsSmallTrades() (gas: 19361)
+[PASS] test_GetMaxAllocation_ReturnsDefault() (gas: 10790)
+[PASS] test_GetMinAllocation_ReturnsCustom() (gas: 65109)
+[PASS] test_GetMinAllocation_ReturnsDefault() (gas: 10856)
+[PASS] test_GetStrategyParams() (gas: 10467)
+[PASS] test_IsRebalanceNeeded_CustomThreshold() (gas: 31602)
+[PASS] test_IsRebalanceNeeded_ReturnsFalse_WhenWithinThreshold() (gas: 18116)
+[PASS] test_IsRebalanceNeeded_ReturnsTrue_WhenAboveThreshold() (gas: 18176)
+[PASS] test_SetApySensitivity_EmitsEvent() (gas: 22797)
+[PASS] test_SetApySensitivity_RevertIf_Invalid() (gas: 15212)
+[PASS] test_SetApySensitivity_RevertIf_NotAdmin() (gas: 14356)
+[PASS] test_SetApySensitivity_Success() (gas: 21583)
+[PASS] test_SetAssetLimits_EmitsEvent() (gas: 66138)
+[PASS] test_SetAssetLimits_RevertIf_MaxTooHigh() (gas: 18594)
+[PASS] test_SetAssetLimits_RevertIf_MinGreaterThanMax() (gas: 18544)
+[PASS] test_SetAssetLimits_RevertIf_ZeroAddress() (gas: 14954)
+[PASS] test_SetAssetLimits_Success() (gas: 67188)
+[PASS] test_SetRebalanceThreshold_EmitsEvent() (gas: 22911)
+[PASS] test_SetRebalanceThreshold_RevertIf_TooHigh() (gas: 15172)
+[PASS] test_SetRebalanceThreshold_RevertIf_Zero() (gas: 15140)
+[PASS] test_SetRebalanceThreshold_Success() (gas: 21458)
+Suite result: ok. 36 passed; 0 failed; 0 skipped; finished in 53.15ms (54.75ms CPU time)
+
+Ran 34 tests for test/AssetRegistry.t.sol:AssetRegistryTest
+[PASS] testFuzz_assetCount_matchesRegistrations(uint8) (runs: 256, μ: 2374752, ~: 1110345)
+[PASS] testFuzz_registerAsset_validAddresses(address) (runs: 256, μ: 3562, ~: 3562)
+[PASS] test_constructor_revertsOnZeroAddress() (gas: 39855)
+[PASS] test_constructor_setsAdmin() (gas: 15359)
+[PASS] test_getActiveAssets_filtersInactive() (gas: 596134)
+[PASS] test_getAllAssets_empty() (gas: 8949)
+[PASS] test_getAllAssets_returnsAll() (gas: 595637)
+[PASS] test_getAssetAddresses_returnsAddresses() (gas: 394037)
+[PASS] test_getAssetByIndex_revertsOnOutOfBounds() (gas: 16157)
+[PASS] test_getAssetByIndex_success() (gas: 399358)
+[PASS] test_getAsset_revertsIfNotRegistered() (gas: 19106)
+[PASS] test_isActive_returnsFalseForUnregistered() (gas: 10834)
+[PASS] test_registerAssetWithMetadata_revertsOnEmptyName() (gas: 20581)
+[PASS] test_registerAssetWithMetadata_revertsOnEmptySymbol() (gas: 20570)
+[PASS] test_registerAssetWithMetadata_success() (gas: 212208)
+[PASS] test_registerAsset_allAssetTypes() (gas: 6541823)
+[PASS] test_registerAsset_allowsZeroOracle() (gas: 220221)
+[PASS] test_registerAsset_emitsEvent() (gas: 215821)
+[PASS] test_registerAsset_revertsIfAlreadyRegistered() (gas: 215288)
+[PASS] test_registerAsset_revertsOnMaxAssetsReached() (gas: 54776168)
+[PASS] test_registerAsset_revertsOnUnauthorized() (gas: 15305)
+[PASS] test_registerAsset_revertsOnZeroAddress() (gas: 13107)
+[PASS] test_registerAsset_success() (gas: 229020)
+[PASS] test_removeAsset_emitsEvent() (gas: 172428)
+[PASS] test_removeAsset_middleElement() (gas: 463003)
+[PASS] test_removeAsset_revertsIfNotRegistered() (gas: 17805)
+[PASS] test_removeAsset_success() (gas: 173334)
+[PASS] test_setAssetStatus_deactivate() (gas: 217591)
+[PASS] test_setAssetStatus_emitsEvent() (gas: 217772)
+[PASS] test_setAssetStatus_reactivate() (gas: 222030)
+[PASS] test_setAssetStatus_revertsIfNotRegistered() (gas: 18111)
+[PASS] test_setOracleSource_emitsEvent() (gas: 218024)
+[PASS] test_setOracleSource_revertsIfNotRegistered() (gas: 18240)
+[PASS] test_setOracleSource_success() (gas: 224719)
+Suite result: ok. 34 passed; 0 failed; 0 skipped; finished in 58.09ms (79.03ms CPU time)
+
+Ran 31 tests for test/SwapHelper.t.sol:SwapHelperTest
+[PASS] testFuzz_BuyRWAAsset(uint256) (runs: 256, μ: 116952, ~: 116464)
+[PASS] testFuzz_SlippageBounds(uint256) (runs: 256, μ: 117628, ~: 117696)
+[PASS] test_BuyRWAAsset_RevertIf_SlippageTooHigh() (gas: 23813)
+[PASS] test_BuyRWAAsset_RevertIf_ZeroAmount() (gas: 22411)
+[PASS] test_BuyRWAAsset_RevertIf_ZeroTokenIn() (gas: 20164)
+[PASS] test_BuyRWAAsset_RevertIf_ZeroTokenOut() (gas: 20209)
+[PASS] test_BuyRWAAsset_Success() (gas: 116644)
+[PASS] test_BuyRWAAsset_UsesDefaultSlippage() (gas: 134600)
+[PASS] test_Constructor_RevertIf_SlippageTooHigh() (gas: 66311)
+[PASS] test_Constructor_RevertIf_ZeroAdmin() (gas: 62817)
+[PASS] test_Constructor_RevertIf_ZeroRouter() (gas: 62806)
+[PASS] test_Constructor_SetsStateCorrectly() (gas: 26423)
+[PASS] test_GetAmountOut_ReturnsZero_ForZeroInput() (gas: 11425)
+[PASS] test_GetAmountOut_Returns_ExpectedAmount() (gas: 25439)
+[PASS] test_GetAmountOut_WithCustomRate() (gas: 32706)
+[PASS] test_SellRWAAsset_RevertIf_ZeroAmount() (gas: 22347)
+[PASS] test_SellRWAAsset_Success() (gas: 116608)
+[PASS] test_SellRWAAsset_WithCustomRate() (gas: 119123)
+[PASS] test_SetDefaultMaxSlippage_EmitsEvent() (gas: 22597)
+[PASS] test_SetDefaultMaxSlippage_RevertIf_NotAdmin() (gas: 14311)
+[PASS] test_SetDefaultMaxSlippage_RevertIf_TooHigh() (gas: 15493)
+[PASS] test_SetDefaultMaxSlippage_Success() (gas: 21402)
+[PASS] test_SetRouter_EmitsEvent() (gas: 27337)
+[PASS] test_SetRouter_RevertIf_NotAdmin() (gas: 16631)
+[PASS] test_SetRouter_RevertIf_ZeroAddress() (gas: 14238)
+[PASS] test_SetRouter_Success() (gas: 24222)
+[PASS] test_SlippageProtection_AtMaxLimit() (gas: 132812)
+[PASS] test_SlippageProtection_RevertIf_ExceedsLimit() (gas: 137994)
+[PASS] test_SlippageProtection_WithMaxAllowedSlippage() (gas: 132794)
+[PASS] test_SlippageProtection_WithinLimits() (gas: 132794)
+[PASS] test_Swap_RevertIf_RouterFails() (gas: 131738)
+Suite result: ok. 31 passed; 0 failed; 0 skipped; finished in 120.97ms (106.90ms CPU time)
+
+Ran 40 tests for test/PNGYVaultCoverage.t.sol:PNGYVaultCoverageTest
+[PASS] test_CachedValue_ExpiresAfterDuration() (gas: 140434)
+[PASS] test_CachedValue_UsedWhenFresh() (gas: 157697)
+[PASS] test_CalculateRWAValue_WithAssetDecimals24() (gas: 216339)
+[PASS] test_CalculateRWAValue_WithAssetDecimals6() (gas: 216288)
+[PASS] test_CalculateRWAValue_WithInactiveAsset() (gas: 83994)
+[PASS] test_CalculateRWAValue_WithZeroBalance() (gas: 55144)
+[PASS] test_CircuitBreaker_DropExactlyAtThreshold() (gas: 733537)
+[PASS] test_CircuitBreaker_NavHigherThanReference() (gas: 403660)
+[PASS] test_Constants_Values() (gas: 13025)
+[PASS] test_MaxRedeem_CapsAtMaxWithdrawal() (gas: 410707)
+[PASS] test_MaxRedeem_WhenPausedWithEmergency() (gas: 420536)
+[PASS] test_MaxWithdraw_ReturnsOwnerAssets() (gas: 377967)
+[PASS] test_PurchaseRWATokens_AllInactive() (gas: 169884)
+[PASS] test_PurchaseRWATokens_PartialAllocation() (gas: 284148)
+[PASS] test_PurchaseRWATokens_ZeroAllocation() (gas: 174491)
+[PASS] test_RebalanceWithNewAllocations_AllocationExceeds100() (gas: 31836)
+[PASS] test_RebalanceWithNewAllocations_InvalidAllocationLength() (gas: 29656)
+[PASS] test_RebalanceWithNewAllocations_NoSwapHelper() (gas: 78449)
+[PASS] test_RebalanceWithNewAllocations_OnlyUpdateAllocations() (gas: 57951)
+[PASS] test_RebalanceWithNewAllocations_SingleAllocationOver100() (gas: 31174)
+[PASS] test_RebalanceWithNewAllocations_WithSwaps() (gas: 356951)
+[PASS] test_Redeem_CircuitBreakerBypassInEmergency() (gas: 300364)
+[PASS] test_Redeem_RevertsExceedsMaxWithdrawal() (gas: 401168)
+[PASS] test_Redeem_RevertsZeroReceiver() (gas: 358496)
+[PASS] test_RemoveRWAAssetWithLiquidation_NoSwapHelper() (gas: 90308)
+[PASS] test_RemoveRWAAssetWithLiquidation_NonAdmin() (gas: 16607)
+[PASS] test_RemoveRWAAssetWithLiquidation_RevertsNotFound() (gas: 928505)
+[PASS] test_RemoveRWAAssetWithLiquidation_Success() (gas: 512711)
+[PASS] test_RemoveRWAAssetWithLiquidation_SwapFails() (gas: 202267)
+[PASS] test_RemoveRWAAssetWithLiquidation_ZeroBalance() (gas: 56962)
+[PASS] test_SellRWATokens_NoHoldings() (gas: 178827)
+[PASS] test_SellRWATokens_SufficientIdleBalance() (gas: 207968)
+[PASS] test_SellRWATokens_ZeroTotalRWAValue() (gas: 205877)
+[PASS] test_SetDefaultSwapSlippage_AtMax() (gas: 21720)
+[PASS] test_SetDefaultSwapSlippage_RevertsAboveMax() (gas: 15719)
+[PASS] test_SetDefaultSwapSlippage_Success() (gas: 24314)
+[PASS] test_SetRWAAssetActive_RevertsNotFound() (gas: 923556)
+[PASS] test_UpdateTargetAllocation_RevertsNotFound() (gas: 923653)
+[PASS] test_Withdraw_ExceedsInstantLimitWithCircuitBreaker() (gas: 6986)
+[PASS] test_Withdraw_RevertsZeroReceiver() (gas: 358500)
+Suite result: ok. 40 passed; 0 failed; 0 skipped; finished in 904.84ms (38.09ms CPU time)
+
+Ran 17 tests for test/PNGYVaultRebalance.t.sol:PNGYVaultRebalanceTest
+[PASS] test_Rebalance_BuyOnly_Success() (gas: 175126)
+[PASS] test_Rebalance_EmitsEvent() (gas: 274096)
+[PASS] test_Rebalance_InvalidatesCache() (gas: 259743)
+[PASS] test_Rebalance_MultipleAssetsComplex() (gas: 377950)
+[PASS] test_Rebalance_RevertIf_ArrayLengthMismatch_Buy() (gas: 34487)
+[PASS] test_Rebalance_RevertIf_ArrayLengthMismatch_Sell() (gas: 34426)
+[PASS] test_Rebalance_RevertIf_AssetNotInHoldings() (gas: 939451)
+[PASS] test_Rebalance_RevertIf_InsufficientBalance() (gas: 80043)
+[PASS] test_Rebalance_RevertIf_NoSwapHelper() (gas: 38330)
+[PASS] test_Rebalance_RevertIf_NotRebalancer() (gas: 22607)
+[PASS] test_Rebalance_RevertIf_Paused() (gas: 57258)
+[PASS] test_Rebalance_RevertIf_ZeroBuyAmount() (gas: 32449)
+[PASS] test_Rebalance_RevertIf_ZeroSellAmount() (gas: 32387)
+[PASS] test_Rebalance_SellAndBuy_Success() (gas: 272370)
+[PASS] test_Rebalance_SellOnly_Success() (gas: 270623)
+[PASS] test_Rebalance_UpdatesTargetAllocation() (gas: 72938)
+[PASS] test_Rebalance_WorksWith_AdminRole() (gas: 163167)
+Suite result: ok. 17 passed; 0 failed; 0 skipped; finished in 904.38ms (13.31ms CPU time)
+
+Ran 158 tests for test/PNGYVault.t.sol:PNGYVaultTest
+[PASS] testFuzz_deposit_invalidAmounts(uint256) (runs: 256, μ: 25601, ~: 24972)
+[PASS] testFuzz_deposit_multipleUsers(uint256,uint256) (runs: 256, μ: 183326, ~: 183505)
+[PASS] testFuzz_deposit_validAmounts(uint256) (runs: 256, μ: 126634, ~: 126734)
+[PASS] testFuzz_mint_validShares(uint256) (runs: 256, μ: 126866, ~: 126966)
+[PASS] testFuzz_redeem_validShares(uint256) (runs: 256, μ: 161424, ~: 161511)
+[PASS] testFuzz_requestWithdraw_validShares(uint256) (runs: 257, μ: 302693, ~: 302762)
+[PASS] testFuzz_setCircuitBreakerThreshold(uint256) (runs: 256, μ: 26573, ~: 27031)
+[PASS] testFuzz_totalAssets_withRWAValue(uint256,uint256) (runs: 257, μ: 1652985, ~: 1653031)
+[PASS] testFuzz_withdraw_validAmounts(uint256) (runs: 256, μ: 155898, ~: 155985)
+[PASS] test_activateCircuitBreaker_emitsEvent() (gas: 175156)
+[PASS] test_activateCircuitBreaker_noopIfAlreadyActive() (gas: 77291)
+[PASS] test_activateCircuitBreaker_revertsNonAdmin() (gas: 13830)
+[PASS] test_activateCircuitBreaker_success() (gas: 75204)
+[PASS] test_activateCircuitBreaker_withReferenceNav() (gas: 197444)
+[PASS] test_addRWAAsset_revertsAlreadyAdded() (gas: 1041880)
+[PASS] test_addRWAAsset_revertsInvalidAllocation() (gas: 925939)
+[PASS] test_addRWAAsset_revertsMaxReached() (gas: 20949979)
+[PASS] test_addRWAAsset_revertsNonAdmin() (gas: 920557)
+[PASS] test_addRWAAsset_revertsNotRegistered() (gas: 4325780)
+[PASS] test_addRWAAsset_revertsZeroAddress() (gas: 14643)
+[PASS] test_addRWAAsset_success() (gas: 4631268)
+[PASS] test_cachedValue_usedWhenFresh() (gas: 1628344)
+[PASS] test_checkCircuitBreaker_alreadyActive_noDoubleEmit() (gas: 234676)
+[PASS] test_checkCircuitBreaker_doesNotTriggerBelowThreshold() (gas: 154149)
+[PASS] test_checkCircuitBreaker_exactThreshold() (gas: 231328)
+[PASS] test_checkCircuitBreaker_justBelowThreshold() (gas: 186939)
+[PASS] test_checkCircuitBreaker_navIncrease() (gas: 154148)
+[PASS] test_checkCircuitBreaker_revertsNoReferenceNav() (gas: 15817)
+[PASS] test_checkCircuitBreaker_revertsNonRebalancer() (gas: 42299)
+[PASS] test_checkCircuitBreaker_triggersOnDrop() (gas: 242532)
+[PASS] test_circuitBreakerDropCalculation() (gas: 227690)
+[PASS] test_circuitBreaker_constants() (gas: 8208)
+[PASS] test_circuitBreaker_initialState() (gas: 17668)
+[PASS] test_circuitBreaker_multipleResets() (gas: 201480)
+[PASS] test_claimWithdraw_emitsEvent() (gas: 286469)
+[PASS] test_claimWithdraw_recalculatesAssets() (gas: 327850)
+[PASS] test_claimWithdraw_revertsAlreadyClaimed() (gas: 288991)
+[PASS] test_claimWithdraw_revertsBeforeDelay() (gas: 300062)
+[PASS] test_claimWithdraw_revertsRequestNotFound() (gas: 20028)
+[PASS] test_claimWithdraw_success() (gas: 293722)
+[PASS] test_constructor_grantsRoles() (gas: 21198)
+[PASS] test_constructor_revertsZeroAdmin() (gas: 124253)
+[PASS] test_constructor_setsAsset() (gas: 8185)
+[PASS] test_constructor_setsName() (gas: 13501)
+[PASS] test_constructor_setsSymbol() (gas: 13413)
+[PASS] test_decimals() (gas: 6174)
+[PASS] test_deposit_differentReceiver() (gas: 123341)
+[PASS] test_deposit_emitsEvent() (gas: 118681)
+[PASS] test_deposit_exactMinimum() (gas: 117356)
+[PASS] test_deposit_gasUsage() (gas: 115564)
+[PASS] test_deposit_largeAmount() (gas: 130793)
+[PASS] test_deposit_multipleDepositsFromSameUser() (gas: 142065)
+[PASS] test_deposit_revertsWhenBelowMinimum() (gas: 20946)
+[PASS] test_deposit_revertsWhenPaused() (gas: 47074)
+[PASS] test_deposit_revertsZeroAmount() (gas: 19734)
+[PASS] test_deposit_revertsZeroReceiver() (gas: 19594)
+[PASS] test_deposit_shareRatioAfterYield() (gas: 209762)
+[PASS] test_deposit_success() (gas: 121255)
+[PASS] test_getRWAHolding_revertsNotFound() (gas: 14082)
+[PASS] test_getRWAHoldings_returnsAll() (gas: 2043261)
+[PASS] test_getRWAValue_returnsZeroWithoutOracle() (gas: 8168)
+[PASS] test_getUserLockedShares() (gas: 318115)
+[PASS] test_getUserLockedShares_afterSomeClaimed() (gas: 482134)
+[PASS] test_getUserLockedShares_multiplePendingRequests() (gas: 572098)
+[PASS] test_getUserPendingRequests() (gas: 552026)
+[PASS] test_maxDeposit_whenPaused() (gas: 40832)
+[PASS] test_maxMint_whenPaused() (gas: 40853)
+[PASS] test_maxRedeem_whenPaused() (gas: 147065)
+[PASS] test_maxWithdraw_capsAtMaximum() (gas: 136042)
+[PASS] test_maxWithdraw_whenPaused() (gas: 147088)
+[PASS] test_maxWithdraw_whenPausedWithEmergency() (gas: 175011)
+[PASS] test_mint_differentReceiver() (gas: 127476)
+[PASS] test_mint_emitsEvent() (gas: 122745)
+[PASS] test_mint_exactMinimumShares() (gas: 121476)
+[PASS] test_mint_gasUsage() (gas: 119706)
+[PASS] test_mint_revertsWhenAssetsBelowMinimum() (gas: 35573)
+[PASS] test_mint_revertsWhenPaused() (gas: 47097)
+[PASS] test_mint_revertsZeroReceiver() (gas: 19570)
+[PASS] test_mint_revertsZeroShares() (gas: 19776)
+[PASS] test_mint_success() (gas: 121531)
+[PASS] test_pauseUnpauseCycle_allowsOperations() (gas: 190633)
+[PASS] test_pause_emitsPausedEvent() (gas: 39171)
+[PASS] test_pause_onlyAdmin() (gas: 44701)
+[PASS] test_redeem_circuitBreakerWithEmergencyBypass() (gas: 233414)
+[PASS] test_redeem_exactMaxWithdrawalShares() (gas: 183914)
+[PASS] test_redeem_instantLimitEnforced() (gas: 143934)
+[PASS] test_redeem_limitedWhenCircuitBreakerActive() (gas: 223393)
+[PASS] test_redeem_ownerNotCaller() (gas: 171846)
+[PASS] test_redeem_revertsWhenPaused() (gas: 151861)
+[PASS] test_redeem_revertsZeroShares() (gas: 20208)
+[PASS] test_redeem_success() (gas: 119735)
+[PASS] test_refreshRWACache_revertsNonRebalancer() (gas: 13852)
+[PASS] test_refreshRWACache_success() (gas: 1617731)
+[PASS] test_removeRWAAsset_firstElement() (gas: 1968399)
+[PASS] test_removeRWAAsset_lastElement() (gas: 1966661)
+[PASS] test_removeRWAAsset_middleElement() (gas: 2969004)
+[PASS] test_removeRWAAsset_revertsNonAdmin() (gas: 1044338)
+[PASS] test_removeRWAAsset_revertsNotFound() (gas: 923275)
+[PASS] test_removeRWAAsset_success() (gas: 948124)
+[PASS] test_requestWithdraw_createsRequest() (gas: 295003)
+[PASS] test_requestWithdraw_exactMaxWithdrawal() (gas: 316828)
+[PASS] test_requestWithdraw_multipleUsers() (gas: 481168)
+[PASS] test_requestWithdraw_revertsExceedsMaxWithdrawal() (gas: 131280)
+[PASS] test_requestWithdraw_revertsInsufficientShares() (gas: 127667)
+[PASS] test_requestWithdraw_revertsWhenPaused() (gas: 149702)
+[PASS] test_requestWithdraw_revertsZeroReceiver() (gas: 121486)
+[PASS] test_requestWithdraw_revertsZeroShares() (gas: 19840)
+[PASS] test_requestWithdraw_success() (gas: 300491)
+[PASS] test_resetCircuitBreaker_emitsEvent() (gas: 160024)
+[PASS] test_resetCircuitBreaker_revertsNonAdmin() (gas: 13763)
+[PASS] test_resetCircuitBreaker_success() (gas: 162850)
+[PASS] test_setAssetRegistry_revertsUnauthorized() (gas: 3386513)
+[PASS] test_setAssetRegistry_success() (gas: 3411746)
+[PASS] test_setCircuitBreakerThreshold_emitsEvent() (gas: 23062)
+[PASS] test_setCircuitBreakerThreshold_revertsExceedsMax() (gas: 15389)
+[PASS] test_setCircuitBreakerThreshold_revertsNonAdmin() (gas: 14437)
+[PASS] test_setCircuitBreakerThreshold_success() (gas: 21646)
+[PASS] test_setEmergencyWithdraw_emitsEvent() (gas: 39073)
+[PASS] test_setEmergencyWithdraw_onlyAdmin() (gas: 14298)
+[PASS] test_setEmergencyWithdraw_success() (gas: 38350)
+[PASS] test_setOracleAdapter_success() (gas: 443601)
+[PASS] test_setRWAAssetActive_revertsNonAdmin() (gas: 1044773)
+[PASS] test_setRWAAssetActive_success() (gas: 1024767)
+[PASS] test_setRWAAssetActive_toggleMultipleTimes() (gas: 1038673)
+[PASS] test_setReferenceNav_revertsNonAdmin() (gas: 14327)
+[PASS] test_setReferenceNav_revertsZero() (gas: 14260)
+[PASS] test_setReferenceNav_success() (gas: 37003)
+[PASS] test_sharePrice_afterDeposit() (gas: 120339)
+[PASS] test_sharePrice_afterYieldAccrual() (gas: 155468)
+[PASS] test_sharePrice_initialPrice() (gas: 9192)
+[PASS] test_supportsInterface_accessControl() (gas: 6498)
+[PASS] test_totalAssets_inactiveRWANotCounted() (gas: 1655887)
+[PASS] test_totalAssets_includesManagedAssets() (gas: 154074)
+[PASS] test_totalAssets_multipleRWAAssets() (gas: 2749979)
+[PASS] test_totalAssets_withNoRWA() (gas: 118665)
+[PASS] test_totalAssets_withRWAValue() (gas: 1644264)
+[PASS] test_unpause_emitsUnpausedEvent() (gas: 30117)
+[PASS] test_unpause_onlyAdmin() (gas: 34616)
+[PASS] test_updateManagedAssets_emitsEvent() (gas: 57126)
+[PASS] test_updateManagedAssets_onlyRebalancer() (gas: 14373)
+[PASS] test_updateManagedAssets_success() (gas: 52312)
+[PASS] test_updateTargetAllocation_revertsNonAdmin() (gas: 1044762)
+[PASS] test_updateTargetAllocation_revertsOnInvalid() (gas: 1041489)
+[PASS] test_updateTargetAllocation_success() (gas: 1049885)
+[PASS] test_withdraw_belowInstantLimitSucceeds() (gas: 135367)
+[PASS] test_withdraw_bypassInstantLimitInEmergency() (gas: 160537)
+[PASS] test_withdraw_bypassesCircuitBreakerInEmergency() (gas: 223892)
+[PASS] test_withdraw_circuitBreakerAndInstantLimitSameThreshold() (gas: 209236)
+[PASS] test_withdraw_emitsEvent() (gas: 118020)
+[PASS] test_withdraw_exactMaxWithdrawal() (gas: 180372)
+[PASS] test_withdraw_instantLimitEnforced() (gas: 141272)
+[PASS] test_withdraw_limitedWhenCircuitBreakerActive() (gas: 209300)
+[PASS] test_withdraw_ownerNotCaller() (gas: 188185)
+[PASS] test_withdraw_revertsExceedsMaximum() (gas: 137934)
+[PASS] test_withdraw_revertsWhenPaused() (gas: 151941)
+[PASS] test_withdraw_revertsZeroAmount() (gas: 20321)
+[PASS] test_withdraw_success() (gas: 116625)
+[PASS] test_withdraw_worksWhenPausedWithEmergency() (gas: 159490)
+Suite result: ok. 158 passed; 0 failed; 0 skipped; finished in 904.94ms (364.89ms CPU time)
+
+Ran 10 tests for test/invariant/PNGYVault.invariant.t.sol:PNGYVaultInvariantTest
+[PASS] invariant_assetsBackedByBalance() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 2       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 2       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003339
+  Bound result 14758
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_callSummary() (runs: 256, calls: 3840, reverts: 2)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 1       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 1       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003960
+  Bound result 14736
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+  === Invariant Test Summary ===
+  Total deposits: 5
+  Total withdraws: 1
+  Total deposited: 4157975 USDT
+  Total withdrawn: 1444 USDT
+  Vault total assets: 4156530 USDT
+  Vault total supply: 4156530 shares
+
+[PASS] invariant_conversionConsistency() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 1       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 3       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003339
+  Bound result 14758
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_ghostConsistency() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 2       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 2       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003339
+  Bound result 14758
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_lockedSharesValid() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 1       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 3       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 9999000000000000020363
+  Bound result 999500000000000000003959
+  Bound result 14736
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_maxRedeemBounded() (runs: 256, calls: 3840, reverts: 1)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 1       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000000696
+  Bound result 6717333487823330609935
+  Bound result 14827
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_maxWithdrawBounded() (runs: 256, calls: 3840, reverts: 3)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 3       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 9999000000000000020363
+  Bound result 999500000000000000003959
+  Bound result 14827
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_sharePriceNonZero() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 2       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 2       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003339
+  Bound result 14758
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_totalAssetsBounded() (runs: 256, calls: 3840, reverts: 4)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 2       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 2       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003339
+  Bound result 14758
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+[PASS] invariant_totalSupplyMatchesBalances() (runs: 256, calls: 3840, reverts: 1)
+
+╭--------------+-----------------+-------+---------+----------╮
+| Contract     | Selector        | Calls | Reverts | Discards |
++=============================================================+
+| VaultHandler | accrueYield     | 653   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | deposit         | 646   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | mint            | 630   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | redeem          | 622   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | requestWithdraw | 634   | 0       | 0        |
+|--------------+-----------------+-------+---------+----------|
+| VaultHandler | withdraw        | 655   | 1       | 0        |
+╰--------------+-----------------+-------+---------+----------╯
+
+Logs:
+  Bound result 875795346495805551059238
+  Bound result 999500000000006942516791
+  Bound result 283680380558622363171020
+  Bound result 999500000000001036882706
+  Bound result 1444893400129011661654
+  Bound result 999500000000000000003341
+  Bound result 14759
+  Bound result 233679548035876598338910
+  Bound result 160203768913403647305890
+
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 1.27s (7.57s CPU time)
+
+Ran 16 test suites in 1.27s (4.40s CPU time): 534 tests passed, 0 failed, 0 skipped (534 total tests)
+
+╭----------------------------------------+--------------------+--------------------+------------------+------------------╮
+| File                                   | % Lines            | % Statements       | % Branches       | % Funcs          |
++========================================================================================================================+
+| script/Counter.s.sol                   | 0.00% (0/5)        | 0.00% (0/3)        | 100.00% (0/0)    | 0.00% (0/2)      |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| script/Deploy.s.sol                    | 0.00% (0/130)      | 0.00% (0/124)      | 0.00% (0/4)      | 0.00% (0/18)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| script/DeployBSCMainnet.s.sol          | 0.00% (0/142)      | 0.00% (0/156)      | 0.00% (0/19)     | 0.00% (0/12)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| script/DeployBSCTestnet.s.sol          | 0.00% (0/99)       | 0.00% (0/101)      | 0.00% (0/2)      | 0.00% (0/9)      |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| script/NetworkConfig.sol               | 0.00% (0/6)        | 0.00% (0/3)        | 100.00% (0/0)    | 0.00% (0/3)      |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| script/TransferToGnosisSafe.s.sol      | 0.00% (0/108)      | 0.00% (0/120)      | 0.00% (0/17)     | 0.00% (0/6)      |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/AssetRegistry.sol                  | 97.78% (88/90)     | 95.79% (91/95)     | 80.95% (17/21)   | 100.00% (17/17)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/Counter.sol                        | 100.00% (4/4)      | 100.00% (2/2)      | 100.00% (0/0)    | 100.00% (2/2)    |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/OracleAdapter.sol                  | 97.70% (85/87)     | 94.17% (97/103)    | 86.96% (20/23)   | 100.00% (18/18)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/PNGYVault.sol                      | 97.16% (411/423)   | 96.42% (485/503)   | 85.71% (96/112)  | 100.00% (54/54)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/RebalanceStrategy.sol              | 99.00% (99/100)    | 97.01% (130/134)   | 81.82% (18/22)   | 100.00% (13/13)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/SwapHelper.sol                     | 94.44% (51/54)     | 95.24% (60/63)     | 78.57% (11/14)   | 100.00% (7/7)    |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/oracles/APROOracle.sol             | 100.00% (72/72)    | 97.47% (77/79)     | 93.75% (15/16)   | 100.00% (17/17)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| src/oracles/ChainlinkOracle.sol        | 98.72% (77/78)     | 94.12% (80/85)     | 80.00% (16/20)   | 100.00% (17/17)  |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/Base.t.sol                        | 50.00% (11/22)     | 52.63% (10/19)     | 0.00% (0/2)      | 16.67% (1/6)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/OracleAdapter.t.sol               | 25.00% (2/8)       | 25.00% (1/4)       | 100.00% (0/0)    | 25.00% (1/4)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/PNGYVault.t.sol                   | 0.00% (0/4)        | 0.00% (0/2)        | 100.00% (0/0)    | 0.00% (0/2)      |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/invariant/Handler.sol             | 87.95% (73/83)     | 85.58% (89/104)    | 75.00% (12/16)   | 75.00% (9/12)    |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/mocks/ERC20Mock.sol               | 75.00% (6/8)       | 75.00% (3/4)       | 100.00% (0/0)    | 75.00% (3/4)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/mocks/MockApi3Server.sol          | 48.00% (12/25)     | 50.00% (7/14)      | 0.00% (0/3)      | 62.50% (5/8)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/mocks/MockChainlinkAggregator.sol | 64.10% (25/39)     | 73.08% (19/26)     | 0.00% (0/2)      | 54.55% (6/11)    |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/mocks/MockOracleAdapter.sol       | 71.43% (10/14)     | 60.00% (6/10)      | 100.00% (0/0)    | 66.67% (4/6)     |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| test/mocks/MockPancakeRouter.sol       | 91.43% (32/35)     | 89.19% (33/37)     | 57.14% (8/14)    | 100.00% (6/6)    |
+|----------------------------------------+--------------------+--------------------+------------------+------------------|
+| Total                                  | 64.67% (1058/1636) | 66.44% (1190/1791) | 69.38% (213/307) | 70.87% (180/254) |
+╰----------------------------------------+--------------------+--------------------+------------------+------------------╯
