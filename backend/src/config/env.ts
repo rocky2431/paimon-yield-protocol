@@ -19,9 +19,16 @@ const envSchema = z.object({
   // Blockchain
   BSC_MAINNET_RPC_URL: z.string().default('https://bsc-dataseed.binance.org'),
   BSC_TESTNET_RPC_URL: z.string().default('https://data-seed-prebsc-1-s1.binance.org:8545'),
+  BSC_MAINNET_WS_URL: z.string().optional(),
+  BSC_TESTNET_WS_URL: z.string().optional(),
 
   // Contracts
   PNGY_VAULT_ADDRESS: z.string().optional(),
+
+  // Event Listener
+  EVENT_LISTENER_ENABLED: z.coerce.boolean().default(false),
+  EVENT_LISTENER_START_BLOCK: z.coerce.bigint().optional(),
+  EVENT_LISTENER_CONFIRMATIONS: z.coerce.number().default(12), // BSC ~12 blocks for finality
 });
 
 export type Env = z.infer<typeof envSchema>;
