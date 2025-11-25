@@ -224,16 +224,16 @@ contract AssetRegistry is AccessControl {
 
     /// @notice Update an asset's active status
     /// @param tokenAddress The token address
-    /// @param isActive The new active status
+    /// @param newActiveStatus The new active status
     function setAssetStatus(
         address tokenAddress,
-        bool isActive
+        bool newActiveStatus
     ) external onlyRole(ADMIN_ROLE) {
         if (!_isRegistered[tokenAddress]) revert AssetNotFound(tokenAddress);
 
-        _assets[tokenAddress].isActive = isActive;
+        _assets[tokenAddress].isActive = newActiveStatus;
 
-        emit AssetStatusUpdated(tokenAddress, isActive);
+        emit AssetStatusUpdated(tokenAddress, newActiveStatus);
     }
 
     /// @notice Update an asset's oracle source

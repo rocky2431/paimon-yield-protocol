@@ -720,7 +720,7 @@
       "priority": "P0",
       "dependencies": ["71", "72"],
       "estimated_days": 2,
-      "status": "pending",
+      "status": "in_progress",
       "type": "feature",
       "trace_to": "specs/architecture.md#74-smart-contract-security"
     },
