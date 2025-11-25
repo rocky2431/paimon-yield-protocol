@@ -109,10 +109,23 @@ export interface RebalanceJobData {
 }
 
 export interface NotificationJobData {
-  type: 'deposit' | 'withdraw' | 'rebalance' | 'alert';
+  /**
+   * Notification type matching Prisma NotificationType enum
+   */
+  type: 'WITHDRAWAL_COMPLETE' | 'REBALANCE_EXECUTED' | 'EMERGENCY_PAUSE' | 'CIRCUIT_BREAKER';
+  /**
+   * Target user address (for user-specific notifications)
+   * If undefined, notification will be broadcast to all subscribed users
+   */
   userAddress?: string;
-  message: string;
-  metadata?: Record<string, unknown>;
+  /**
+   * Notification-specific data passed to email templates
+   */
+  data: Record<string, unknown>;
+  /**
+   * Priority level (higher = more important)
+   */
+  priority?: 'low' | 'normal' | 'high' | 'critical';
 }
 
 // =============================================================================
@@ -140,7 +153,51 @@ export async function addRebalanceJob(data: RebalanceJobData) {
 }
 
 export async function addNotificationJob(data: NotificationJobData) {
-  return notificationQueue.add('send', data);
+  // Map priority to BullMQ priority (lower number = higher priority)
+  const priorityMap: Record<string, number> = {
+    critical: 1,
+    high: 2,
+    normal: 3,
+    low: 4,
+  };
+
+  return notificationQueue.add('send', data, {
+    priority: priorityMap[data.priority || 'normal'],
+    // Critical notifications (emergency/circuit breaker) should not be delayed
+    delay: data.priority === 'critical' ? 0 : undefined,
+  });
+}
+
+/**
+ * Add a user-specific notification job
+ */
+export async function addUserNotificationJob(
+  userAddress: string,
+  type: NotificationJobData['type'],
+  data: Record<string, unknown>,
+  priority: NotificationJobData['priority'] = 'normal'
+) {
+  return addNotificationJob({
+    type,
+    userAddress,
+    data,
+    priority,
+  });
+}
+
+/**
+ * Add a broadcast notification job (sent to all subscribed users)
+ */
+export async function addBroadcastNotificationJob(
+  type: NotificationJobData['type'],
+  data: Record<string, unknown>,
+  priority: NotificationJobData['priority'] = 'normal'
+) {
+  return addNotificationJob({
+    type,
+    data,
+    priority,
+  });
 }
 
 // =============================================================================
