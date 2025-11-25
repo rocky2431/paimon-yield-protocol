@@ -7,6 +7,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import { healthRoutes } from './routes/health.js';
 import { vaultRoutes } from './routes/vault.js';
 import { transactionRoutes } from './routes/transactions.js';
+import { netvalueRoutes } from './routes/netvalue.js';
 
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -58,6 +59,7 @@ export async function buildServer(): Promise<FastifyInstance> {
         { name: 'health', description: 'Health check endpoints' },
         { name: 'vault', description: 'Vault operations' },
         { name: 'transactions', description: 'Transaction history' },
+        { name: 'netvalue', description: 'Historical net value data' },
       ],
     },
   });
@@ -74,6 +76,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(healthRoutes, { prefix: '/api' });
   await server.register(vaultRoutes, { prefix: '/api/vault' });
   await server.register(transactionRoutes, { prefix: '/api' });
+  await server.register(netvalueRoutes, { prefix: '/api' });
 
   return server;
 }
