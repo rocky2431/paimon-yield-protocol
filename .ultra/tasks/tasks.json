@@ -576,7 +576,7 @@
       "priority": "P0",
       "dependencies": ["4", "5"],
       "estimated_days": 2.5,
-      "status": "pending",
+      "status": "in_progress",
       "type": "feature",
       "trace_to": "specs/architecture.md#43-backend-components"
     },
