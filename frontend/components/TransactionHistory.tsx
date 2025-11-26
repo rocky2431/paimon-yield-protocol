@@ -382,15 +382,18 @@ function TypeIcon({ type }: { type: Transaction['type'] }) {
   );
 }
 
-// Loading Skeleton
+// Loading Skeleton - Fixed dimensions prevent CLS
 function LoadingSkeleton() {
   return (
-    <div className="animate-pulse flex items-center gap-4 p-4">
-      <div className="h-10 w-32 bg-gray-200 rounded"></div>
-      <div className="h-10 w-20 bg-gray-200 rounded"></div>
-      <div className="h-10 w-24 bg-gray-200 rounded flex-1"></div>
-      <div className="h-10 w-20 bg-gray-200 rounded"></div>
-      <div className="h-10 w-28 bg-gray-200 rounded"></div>
+    <div
+      className="animate-pulse flex items-center gap-4 p-4 border-b border-gray-100"
+      style={{ height: '72px' }} // Fixed height matches table rows
+    >
+      <div className="h-4 w-32 bg-gray-200 rounded" />
+      <div className="h-4 w-20 bg-gray-200 rounded" />
+      <div className="h-4 w-24 bg-gray-200 rounded flex-1" />
+      <div className="h-4 w-20 bg-gray-200 rounded" />
+      <div className="h-4 w-28 bg-gray-200 rounded" />
     </div>
   );
 }
