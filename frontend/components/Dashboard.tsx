@@ -356,11 +356,21 @@ function StatCard({ title, value, subValue, icon, testId, highlight }: StatCardP
   );
 }
 
-// Loading Skeleton
+// Loading Skeleton - Fixed dimensions prevent CLS
 function LoadingSkeleton() {
   return (
-    <div className="animate-pulse">
-      <div className="h-24 bg-gray-200 rounded-lg"></div>
+    <div
+      className="animate-pulse bg-gray-50 rounded-lg border border-gray-100 p-4"
+      style={{ height: '104px' }} // Fixed height matches StatCard
+    >
+      <div className="flex items-start justify-between">
+        <div className="space-y-2 flex-1">
+          <div className="h-4 w-20 bg-gray-200 rounded" />
+          <div className="h-8 w-32 bg-gray-200 rounded" />
+          <div className="h-3 w-16 bg-gray-200 rounded" />
+        </div>
+        <div className="h-10 w-10 bg-gray-200 rounded-lg" />
+      </div>
     </div>
   );
 }

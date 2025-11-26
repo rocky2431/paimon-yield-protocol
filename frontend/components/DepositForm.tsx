@@ -12,6 +12,7 @@ import { parseUnits, formatUnits, encodeFunctionData } from 'viem';
 import { contracts } from '@/lib/wagmi/config';
 import { ERC20_ABI, PNGY_VAULT_ABI, MIN_DEPOSIT } from '@/lib/contracts/abis';
 import { useWallet } from './WalletConnect';
+import { useDebounce } from '@/lib/performance/hooks';
 
 // Transaction status type
 type TxStatus = 'idle' | 'approving' | 'approved' | 'depositing' | 'success' | 'error';
@@ -30,6 +31,9 @@ export function DepositForm({ className = '', onDepositSuccess }: DepositFormPro
   const [txStatus, setTxStatus] = useState<TxStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  // Debounce amount for contract calls (300ms) - INP optimization
+  const debouncedAmount = useDebounce(amount, 300);
+
   // Get contract addresses for current chain
   const getContractAddresses = () => {
     if (!chainId) return null;
@@ -40,8 +44,9 @@ export function DepositForm({ className = '', onDepositSuccess }: DepositFormPro
   const vaultAddress = contractAddresses?.pngyVault;
   const usdtAddress = contractAddresses?.usdt;
 
-  // Parse amount to BigInt
+  // Parse amount to BigInt (use debounced for contract calls, immediate for UI)
   const parsedAmount = amount ? parseUnits(amount, usdtDecimals) : BigInt(0);
+  const debouncedParsedAmount = debouncedAmount ? parseUnits(debouncedAmount, usdtDecimals) : BigInt(0);
 
   // Read USDT allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -54,14 +59,14 @@ export function DepositForm({ className = '', onDepositSuccess }: DepositFormPro
     },
   });
 
-  // Preview deposit (get expected shares)
+  // Preview deposit (get expected shares) - uses debounced amount to reduce RPC calls
   const { data: previewShares, isLoading: isPreviewLoading } = useReadContract({
     address: vaultAddress,
     abi: PNGY_VAULT_ABI,
     functionName: 'previewDeposit',
-    args: parsedAmount > 0 ? [parsedAmount] : undefined,
+    args: debouncedParsedAmount > 0 ? [debouncedParsedAmount] : undefined,
     query: {
-      enabled: !!vaultAddress && parsedAmount > 0,
+      enabled: !!vaultAddress && debouncedParsedAmount > 0,
     },
   });
 
@@ -103,18 +108,18 @@ export function DepositForm({ className = '', onDepositSuccess }: DepositFormPro
       hash: depositHash,
     });
 
-  // Gas estimation for deposit
+  // Gas estimation for deposit - uses debounced amount to reduce RPC calls
   const { data: estimatedGas } = useEstimateGas({
     to: vaultAddress,
-    data: vaultAddress && address && parsedAmount > 0
+    data: vaultAddress && address && debouncedParsedAmount > 0
       ? encodeFunctionData({
           abi: PNGY_VAULT_ABI,
           functionName: 'deposit',
-          args: [parsedAmount, address],
+          args: [debouncedParsedAmount, address],
         })
       : undefined,
     query: {
-      enabled: !!vaultAddress && !!address && parsedAmount > 0 && (allowance ?? BigInt(0)) >= parsedAmount,
+      enabled: !!vaultAddress && !!address && debouncedParsedAmount > 0 && (allowance ?? BigInt(0)) >= debouncedParsedAmount,
     },
   });
 
