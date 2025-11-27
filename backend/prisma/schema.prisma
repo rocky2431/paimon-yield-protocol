@@ -207,6 +207,44 @@ enum NotificationType {
   REBALANCE_EXECUTED
   EMERGENCY_PAUSE
   CIRCUIT_BREAKER
+  LARGE_WITHDRAWAL_ALERT
+}
+
+// =============================================================================
+// Large Withdrawal Requests (Priority Processing)
+// =============================================================================
+
+model LargeWithdrawal {
+  id              String                @id @default(cuid())
+  userAddress     String                @db.VarChar(42)
+  requestTxHash   String?               @db.VarChar(66)      // Initial request tx
+  completeTxHash  String?               @db.VarChar(66)      // Completion tx
+  shares          Decimal               @db.Decimal(78, 0)   // PNGY shares to withdraw
+  estimatedAmount Decimal               @db.Decimal(78, 0)   // Estimated USDT amount
+  actualAmount    Decimal?              @db.Decimal(78, 0)   // Actual USDT received
+  status          LargeWithdrawalStatus @default(PENDING)
+  priority        Int                   @default(1)          // 1=highest, 5=lowest
+  adminNotes      String?
+  requestedAt     DateTime              @default(now())
+  processedAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([userAddress])
+  @@index([status])
+  @@index([priority])
+  @@index([requestedAt])
+}
+
+enum LargeWithdrawalStatus {
+  PENDING           // Awaiting admin review
+  APPROVED          // Admin approved, processing
+  PROCESSING        // Funds being prepared
+  READY             // Funds ready for withdrawal
+  COMPLETED         // Withdrawal complete
+  REJECTED          // Admin rejected
+  CANCELLED         // User cancelled
 }
 
 enum NotificationChannel {
