@@ -636,7 +636,7 @@
       "priority": "P2",
       "dependencies": ["4", "5"],
       "estimated_days": 2.5,
-      "status": "pending",
+      "status": "completed",
       "type": "feature",
       "trace_to": "specs/product.md#user-story-52-大额赎回优先通道"
     },
